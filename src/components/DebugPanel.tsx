@@ -1,7 +1,20 @@
 import { Bug, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { DebugInfo } from '@/hooks/useMailApi';
+
+export interface DebugInfo {
+  lastRequest: {
+    url: string;
+    method: string;
+    body?: string;
+  } | null;
+  lastResponse: {
+    status: number;
+    statusText: string;
+    text: string;
+  } | null;
+  lastError: string | null;
+}
 
 interface DebugPanelProps {
   debugInfo: DebugInfo;

@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useMailApi } from '@/hooks/useMailApi';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { TopBar } from '@/components/TopBar';
 import { AddressCard } from '@/components/AddressCard';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
 import { ErrorBanner } from '@/components/ErrorBanner';
-import { DebugPanel } from '@/components/DebugPanel';
-import { useMailApi } from '@/hooks/useMailApi';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const Index = () => {
+const Inbox = () => {
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
+  
   const [selectedDomain, setSelectedDomain] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
-  const [debugOpen, setDebugOpen] = useState(false);
 
   const {
     domains,
@@ -21,12 +25,18 @@ const Index = () => {
     selectedMessage,
     loading,
     error,
-    debugInfo,
     setError,
     generateInbox,
     fetchMessage,
     setSelectedMessage,
   } = useMailApi();
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   // Set default domain when domains load
   useEffect(() => {
@@ -53,6 +63,28 @@ const Index = () => {
     setSelectedMessage(null);
   };
 
+  // Show loading skeleton while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="h-16 border-b border-border/50 bg-card">
+          <div className="h-full px-4 flex items-center">
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </div>
+        <div className="flex-1 p-4 md:p-6">
+          <Skeleton className="h-32 w-full rounded-2xl mb-6" />
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar
@@ -61,6 +93,8 @@ const Index = () => {
         onDomainChange={setSelectedDomain}
         onGenerate={handleGenerate}
         loading={loading.inbox || loading.domains}
+        user={user}
+        onLogout={logout}
       />
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -119,15 +153,8 @@ const Index = () => {
           )}
         </div>
       </div>
-
-      {/* Debug Panel */}
-      <DebugPanel
-        debugInfo={debugInfo}
-        isOpen={debugOpen}
-        onToggle={() => setDebugOpen(!debugOpen)}
-      />
     </div>
   );
 };
 
-export default Index;
+export default Inbox;
