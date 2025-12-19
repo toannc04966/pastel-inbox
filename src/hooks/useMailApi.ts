@@ -60,7 +60,7 @@ export function useMailApi() {
   const fetchDomains = useCallback(async () => {
     setLoading(prev => ({ ...prev, domains: true }));
     try {
-      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/v1/domains');
+      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/domains');
       if (res.ok && res.data) {
         setDomains(res.data.domains);
       }
