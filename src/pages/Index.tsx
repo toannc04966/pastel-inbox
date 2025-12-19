@@ -4,6 +4,7 @@ import { AddressCard } from '@/components/AddressCard';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
 import { ErrorBanner } from '@/components/ErrorBanner';
+import { DebugPanel } from '@/components/DebugPanel';
 import { useMailApi } from '@/hooks/useMailApi';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -11,6 +12,7 @@ const Index = () => {
   const isMobile = useIsMobile();
   const [selectedDomain, setSelectedDomain] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const {
     domains,
@@ -19,6 +21,7 @@ const Index = () => {
     selectedMessage,
     loading,
     error,
+    debugInfo,
     setError,
     generateInbox,
     fetchMessage,
@@ -33,7 +36,9 @@ const Index = () => {
   }, [domains, selectedDomain]);
 
   const handleGenerate = () => {
-    generateInbox(selectedDomain);
+    if (selectedDomain) {
+      generateInbox(selectedDomain, 10);
+    }
   };
 
   const handleSelectMessage = (id: string) => {
@@ -114,6 +119,13 @@ const Index = () => {
           )}
         </div>
       </div>
+
+      {/* Debug Panel */}
+      <DebugPanel
+        debugInfo={debugInfo}
+        isOpen={debugOpen}
+        onToggle={() => setDebugOpen(!debugOpen)}
+      />
     </div>
   );
 };
