@@ -1,20 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiFetch, ApiError } from '@/lib/api';
 import type { Inbox, MessagePreview, Message, ApiResponse } from '@/types/mail';
+import { toast } from 'sonner';
 
-const API_BASE = 'https://temp-mail-worker.ahn2k22.workers.dev';
+const STORAGE_KEY = 'tempmail_inbox';
 
-export interface DebugInfo {
-  lastRequest: {
-    url: string;
-    method: string;
-    body?: string;
-  } | null;
-  lastResponse: {
-    status: number;
-    statusText: string;
-    text: string;
-  } | null;
-  lastError: string | null;
+interface StoredInbox {
+  inboxId: string;
+  address: string;
+  domain: string;
 }
 
 export function useMailApi() {
@@ -23,61 +17,57 @@ export function useMailApi() {
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState({
-    domains: false,
+    domains: true,
     inbox: false,
     messages: false,
     message: false,
   });
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<DebugInfo>({
-    lastRequest: null,
-    lastResponse: null,
-    lastError: null,
-  });
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateDebug = (
-    request: DebugInfo['lastRequest'],
-    response?: DebugInfo['lastResponse'],
-    error?: string
-  ) => {
-    setDebugInfo({
-      lastRequest: request,
-      lastResponse: response || null,
-      lastError: error || null,
-    });
-  };
+  // Load inbox from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        const parsed: StoredInbox = JSON.parse(stored);
+        setInbox({
+          id: parsed.inboxId,
+          address: parsed.address,
+          domain: parsed.domain,
+          createdAt: '',
+        });
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Persist inbox to localStorage
+  useEffect(() => {
+    if (inbox) {
+      const toStore: StoredInbox = {
+        inboxId: inbox.id,
+        address: inbox.address,
+        domain: inbox.domain,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+    }
+  }, [inbox]);
 
   const fetchDomains = useCallback(async () => {
     setLoading(prev => ({ ...prev, domains: true }));
-    const url = `${API_BASE}/api/v1/domains`;
-    const request = { url, method: 'GET' };
-    
     try {
-      updateDebug(request);
-      const res = await fetch(url, { mode: 'cors' });
-      const text = await res.text();
-      
-      updateDebug(request, {
-        status: res.status,
-        statusText: res.statusText,
-        text: text.substring(0, 2000),
-      });
-
-      if (!res.ok) {
-        setError(`Failed to fetch domains: ${res.status} ${res.statusText} - ${text.substring(0, 200)}`);
-        return;
-      }
-
-      const json: ApiResponse<{ domains: string[] }> = JSON.parse(text);
-      if (json.ok && json.data) {
-        setDomains(json.data.domains);
-      } else {
-        setError(json.error?.message || 'Failed to fetch domains');
+      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/v1/domains');
+      if (res.ok && res.data) {
+        setDomains(res.data.domains);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      updateDebug(request, undefined, errorMsg);
-      setError(`Network error fetching domains: ${errorMsg}`);
+      const apiErr = err as ApiError;
+      setError(`Failed to fetch domains: ${apiErr.message}`);
+      toast.error('Failed to load domains');
     } finally {
       setLoading(prev => ({ ...prev, domains: false }));
     }
@@ -86,53 +76,25 @@ export function useMailApi() {
   const generateInbox = useCallback(async (domain?: string, length: number = 10) => {
     setLoading(prev => ({ ...prev, inbox: true }));
     setError(null);
-    
-    const url = `${API_BASE}/api/v1/inboxes`;
-    const body = JSON.stringify({ domain, length });
-    const request = { url, method: 'POST', body };
 
     try {
-      updateDebug(request);
-      
-      const res = await fetch(url, {
+      const res = await apiFetch<ApiResponse<{ inbox: Inbox }>>('/api/v1/inboxes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        mode: 'cors',
-      });
-      
-      const text = await res.text();
-      
-      updateDebug(request, {
-        status: res.status,
-        statusText: res.statusText,
-        text: text.substring(0, 2000),
+        body: JSON.stringify({ domain, length }),
       });
 
-      if (!res.ok) {
-        setError(`Failed to generate inbox: ${res.status} ${res.statusText} - URL: ${url} - Response: ${text.substring(0, 300)}`);
-        return;
-      }
-
-      let json: ApiResponse<{ inbox: Inbox }>;
-      try {
-        json = JSON.parse(text);
-      } catch (parseErr) {
-        setError(`JSON parse error. Raw response: ${text.substring(0, 500)}`);
-        return;
-      }
-
-      if (json.ok && json.data) {
-        setInbox(json.data.inbox);
+      if (res.ok && res.data) {
+        setInbox(res.data.inbox);
         setMessages([]);
         setSelectedMessage(null);
+        toast.success('Address generated!');
       } else {
-        setError(json.error?.message || 'Failed to generate inbox - API returned ok: false');
+        throw { message: 'Failed to generate inbox', status: 500 };
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? `${err.name}: ${err.message}` : 'Unknown error';
-      updateDebug(request, undefined, errorMsg);
-      setError(`Network error generating inbox: ${errorMsg}. URL: ${url}`);
+      const apiErr = err as ApiError;
+      setError(`Failed to generate inbox: ${apiErr.message}`);
+      toast.error(apiErr.message);
     } finally {
       setLoading(prev => ({ ...prev, inbox: false }));
     }
@@ -140,38 +102,29 @@ export function useMailApi() {
 
   const fetchMessages = useCallback(async () => {
     if (!inbox?.id) return;
-    
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(prev => ({ ...prev, messages: true }));
-    
-    // IMPORTANT: URL-encode the inbox ID because it contains "@"
-    const encodedInboxId = encodeURIComponent(inbox.id);
-    const url = `${API_BASE}/api/v1/inboxes/${encodedInboxId}/messages?limit=30`;
-    const request = { url, method: 'GET' };
 
     try {
-      updateDebug(request);
-      const res = await fetch(url, { mode: 'cors' });
-      const text = await res.text();
-      
-      updateDebug(request, {
-        status: res.status,
-        statusText: res.statusText,
-        text: text.substring(0, 2000),
-      });
+      const encodedId = encodeURIComponent(inbox.id);
+      const res = await apiFetch<ApiResponse<{ inboxId: string; messages: MessagePreview[] }>>(
+        `/api/v1/inboxes/${encodedId}/messages?limit=30`,
+        { signal: abortControllerRef.current.signal }
+      );
 
-      if (!res.ok) {
-        // Silent fail for polling, but update debug
-        return;
-      }
-
-      const json: ApiResponse<{ inboxId: string; messages: MessagePreview[] }> = JSON.parse(text);
-      if (json.ok && json.data) {
-        setMessages(json.data.messages);
+      if (res.ok && res.data) {
+        setMessages(res.data.messages);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      updateDebug(request, undefined, errorMsg);
+      if ((err as Error).name === 'AbortError') return;
       // Silent fail for polling
+      console.error('[Mail] Fetch messages error:', err);
     } finally {
       setLoading(prev => ({ ...prev, messages: false }));
     }
@@ -179,54 +132,49 @@ export function useMailApi() {
 
   const fetchMessage = useCallback(async (messageId: string) => {
     setLoading(prev => ({ ...prev, message: true }));
-    
-    const url = `${API_BASE}/api/v1/messages/${encodeURIComponent(messageId)}`;
-    const request = { url, method: 'GET' };
 
     try {
-      updateDebug(request);
-      const res = await fetch(url, { mode: 'cors' });
-      const text = await res.text();
-      
-      updateDebug(request, {
-        status: res.status,
-        statusText: res.statusText,
-        text: text.substring(0, 2000),
-      });
+      const res = await apiFetch<ApiResponse<{ message: Message }>>(
+        `/api/v1/messages/${encodeURIComponent(messageId)}`
+      );
 
-      if (!res.ok) {
-        setError(`Failed to fetch message: ${res.status} - ${text.substring(0, 200)}`);
-        return;
-      }
-
-      const json: ApiResponse<{ message: Message }> = JSON.parse(text);
-      if (json.ok && json.data) {
-        setSelectedMessage(json.data.message);
+      if (res.ok && res.data) {
+        setSelectedMessage(res.data.message);
       } else {
-        setError(json.error?.message || 'Failed to fetch message');
+        throw { message: 'Failed to fetch message', status: 500 };
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-      updateDebug(request, undefined, errorMsg);
-      setError(`Network error fetching message: ${errorMsg}`);
+      const apiErr = err as ApiError;
+      setError(`Failed to fetch message: ${apiErr.message}`);
+      toast.error('Failed to load message');
     } finally {
       setLoading(prev => ({ ...prev, message: false }));
     }
   }, []);
 
-  // Initial domain fetch
+  // Fetch domains on mount
   useEffect(() => {
     fetchDomains();
   }, [fetchDomains]);
 
-  // Poll messages every 5 seconds ONLY when we have an inbox
+  // Poll messages every 5 seconds when inbox exists
   useEffect(() => {
     if (!inbox?.id) return;
-    
+
+    // Initial fetch
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
-    
-    return () => clearInterval(interval);
+
+    // Set up polling
+    pollIntervalRef.current = setInterval(fetchMessages, 5000);
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [inbox?.id, fetchMessages]);
 
   return {
@@ -236,7 +184,6 @@ export function useMailApi() {
     selectedMessage,
     loading,
     error,
-    debugInfo,
     setError,
     generateInbox,
     fetchMessage,
