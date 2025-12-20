@@ -1,24 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '@/lib/api';
-import type { Inbox, MessagePreview, Message, ApiResponse } from '@/types/mail';
+import type { MessagePreview, Message, ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
 
-const STORAGE_KEY = 'tempmail_inbox';
-
-interface StoredInbox {
-  inboxId: string;
-  address: string;
-  domain: string;
-}
+const ALL_DOMAINS = '__all__';
 
 export function useMailApi() {
   const [domains, setDomains] = useState<string[]>([]);
-  const [inbox, setInbox] = useState<Inbox | null>(null);
+  const [selectedDomain, setSelectedDomain] = useState<string>(ALL_DOMAINS);
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState({
     domains: true,
-    inbox: false,
     messages: false,
     message: false,
   });
@@ -27,40 +20,10 @@ export function useMailApi() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load inbox from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed: StoredInbox = JSON.parse(stored);
-        setInbox({
-          id: parsed.inboxId,
-          address: parsed.address,
-          domain: parsed.domain,
-          createdAt: '',
-        });
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    }
-  }, []);
-
-  // Persist inbox to localStorage
-  useEffect(() => {
-    if (inbox) {
-      const toStore: StoredInbox = {
-        inboxId: inbox.id,
-        address: inbox.address,
-        domain: inbox.domain,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-    }
-  }, [inbox]);
-
   const fetchDomains = useCallback(async () => {
     setLoading(prev => ({ ...prev, domains: true }));
     try {
-      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/domains');
+      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/v1/domains');
       if (res.ok && res.data) {
         setDomains(res.data.domains);
       }
@@ -73,36 +36,7 @@ export function useMailApi() {
     }
   }, []);
 
-  const generateInbox = useCallback(async (domain?: string, length: number = 10) => {
-    setLoading(prev => ({ ...prev, inbox: true }));
-    setError(null);
-
-    try {
-      const res = await apiFetch<ApiResponse<{ inbox: Inbox }>>('/api/v1/inboxes', {
-        method: 'POST',
-        body: JSON.stringify({ domain, length }),
-      });
-
-      if (res.ok && res.data) {
-        setInbox(res.data.inbox);
-        setMessages([]);
-        setSelectedMessage(null);
-        toast.success('Address generated!');
-      } else {
-        throw { message: 'Failed to generate inbox', status: 500 };
-      }
-    } catch (err) {
-      const apiErr = err as ApiError;
-      setError(`Failed to generate inbox: ${apiErr.message}`);
-      toast.error(apiErr.message);
-    } finally {
-      setLoading(prev => ({ ...prev, inbox: false }));
-    }
-  }, []);
-
   const fetchMessages = useCallback(async () => {
-    if (!inbox?.id) return;
-
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -112,9 +46,12 @@ export function useMailApi() {
     setLoading(prev => ({ ...prev, messages: true }));
 
     try {
-      const encodedId = encodeURIComponent(inbox.id);
-      const res = await apiFetch<ApiResponse<{ inboxId: string; messages: MessagePreview[] }>>(
-        `/api/v1/inboxes/${encodedId}/messages?limit=30`,
+      const url = selectedDomain === ALL_DOMAINS
+        ? '/api/v1/messages'
+        : `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
+      
+      const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
+        url,
         { signal: abortControllerRef.current.signal }
       );
 
@@ -123,12 +60,11 @@ export function useMailApi() {
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      // Silent fail for polling
       console.error('[Mail] Fetch messages error:', err);
     } finally {
       setLoading(prev => ({ ...prev, messages: false }));
     }
-  }, [inbox?.id]);
+  }, [selectedDomain]);
 
   const fetchMessage = useCallback(async (messageId: string) => {
     setLoading(prev => ({ ...prev, message: true }));
@@ -152,20 +88,28 @@ export function useMailApi() {
     }
   }, []);
 
+  const handleDomainChange = useCallback((domain: string) => {
+    setSelectedDomain(domain);
+    setSelectedMessage(null);
+  }, []);
+
+  const refreshMessages = useCallback(() => {
+    fetchMessages();
+    toast.success('Refreshed');
+  }, [fetchMessages]);
+
   // Fetch domains on mount
   useEffect(() => {
     fetchDomains();
   }, [fetchDomains]);
 
-  // Poll messages every 5 seconds when inbox exists
+  // Poll messages every 30 seconds and when domain changes
   useEffect(() => {
-    if (!inbox?.id) return;
-
     // Initial fetch
     fetchMessages();
 
     // Set up polling
-    pollIntervalRef.current = setInterval(fetchMessages, 5000);
+    pollIntervalRef.current = setInterval(fetchMessages, 30000);
 
     return () => {
       if (pollIntervalRef.current) {
@@ -175,18 +119,20 @@ export function useMailApi() {
         abortControllerRef.current.abort();
       }
     };
-  }, [inbox?.id, fetchMessages]);
+  }, [fetchMessages]);
 
   return {
     domains,
-    inbox,
+    selectedDomain,
     messages,
     selectedMessage,
     loading,
     error,
     setError,
-    generateInbox,
+    handleDomainChange,
     fetchMessage,
     setSelectedMessage,
+    refreshMessages,
+    ALL_DOMAINS,
   };
 }

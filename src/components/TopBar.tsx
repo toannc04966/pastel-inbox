@@ -13,8 +13,9 @@ import type { User } from '@/types/auth';
 interface TopBarProps {
   domains: string[];
   selectedDomain: string;
+  allDomainsValue: string;
   onDomainChange: (domain: string) => void;
-  onGenerate: () => void;
+  onRefresh: () => void;
   loading: boolean;
   user?: User | null;
   onLogout?: () => void;
@@ -23,8 +24,9 @@ interface TopBarProps {
 export function TopBar({
   domains,
   selectedDomain,
+  allDomainsValue,
   onDomainChange,
-  onGenerate,
+  onRefresh,
   loading,
   user,
   onLogout,
@@ -38,7 +40,7 @@ export function TopBar({
         <div>
           <h1 className="text-lg font-semibold text-foreground">Temp Mail</h1>
           <span className="text-xs text-muted-foreground hidden sm:block">
-            Auto refresh every 5s
+            Auto refresh every 30s
           </span>
         </div>
       </div>
@@ -46,13 +48,16 @@ export function TopBar({
       <div className="flex items-center gap-3">
         {/* Domain Selector */}
         {loading && domains.length === 0 ? (
-          <Skeleton className="w-32 h-10 rounded-xl" />
+          <Skeleton className="w-40 h-10 rounded-xl" />
         ) : (
           <Select value={selectedDomain} onValueChange={onDomainChange}>
-            <SelectTrigger className="w-[140px] rounded-xl bg-secondary border-0 h-10">
+            <SelectTrigger className="w-[160px] rounded-xl bg-secondary border-0 h-10">
               <SelectValue placeholder="Select domain" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
+              <SelectItem value={allDomainsValue} className="rounded-lg">
+                All domains
+              </SelectItem>
               {domains.map((domain) => (
                 <SelectItem key={domain} value={domain} className="rounded-lg">
                   @{domain}
@@ -62,20 +67,15 @@ export function TopBar({
           </Select>
         )}
 
-        {/* Generate Button */}
+        {/* Refresh Button */}
         <Button
-          onClick={onGenerate}
-          disabled={loading || !selectedDomain}
-          className="rounded-xl h-10 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+          onClick={onRefresh}
+          disabled={loading}
+          variant="outline"
+          className="rounded-xl h-10 px-4"
         >
-          {loading ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              <span className="hidden sm:inline">Generate address</span>
-              <span className="sm:hidden">Generate</span>
-            </>
-          )}
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
 
         {/* User & Logout */}
