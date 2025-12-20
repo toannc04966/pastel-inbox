@@ -1,18 +1,34 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { apiFetch, ApiError } from '@/lib/api';
 import type { MessagePreview, Message, ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
 
 const ALL_DOMAINS = '__all__';
-const DOMAIN_PARAM = 'domain';
+const DOMAIN_STORAGE_KEY = 'tempmail_selected_domain';
+
+function getStoredDomain(): string {
+  try {
+    return localStorage.getItem(DOMAIN_STORAGE_KEY) || ALL_DOMAINS;
+  } catch {
+    return ALL_DOMAINS;
+  }
+}
+
+function setStoredDomain(domain: string): void {
+  try {
+    if (domain === ALL_DOMAINS) {
+      localStorage.removeItem(DOMAIN_STORAGE_KEY);
+    } else {
+      localStorage.setItem(DOMAIN_STORAGE_KEY, domain);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 export function useMailApi() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialDomain = searchParams.get(DOMAIN_PARAM) || ALL_DOMAINS;
-  
   const [domains, setDomains] = useState<string[]>([]);
-  const [selectedDomain, setSelectedDomain] = useState<string>(initialDomain);
+  const [selectedDomain, setSelectedDomain] = useState<string>(getStoredDomain);
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState({
@@ -97,15 +113,8 @@ export function useMailApi() {
   const handleDomainChange = useCallback((domain: string) => {
     setSelectedDomain(domain);
     setSelectedMessage(null);
-    // Persist domain in URL
-    const newParams = new URLSearchParams(searchParams);
-    if (domain === ALL_DOMAINS) {
-      newParams.delete(DOMAIN_PARAM);
-    } else {
-      newParams.set(DOMAIN_PARAM, domain);
-    }
-    setSearchParams(newParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+    setStoredDomain(domain);
+  }, []);
 
   const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
     setLoading(prev => ({ ...prev, deleting: true }));
