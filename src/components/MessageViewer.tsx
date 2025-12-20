@@ -70,8 +70,45 @@ export function MessageViewer({
 
   if (!message) return null;
 
-  // Get raw content from message
-  const rawContent = message.content?.raw || '';
+  // Determine content to display: prefer html > text > raw
+  const htmlContent = message.html || message.content?.html || '';
+  const textContent = message.text || message.content?.text || '';
+  const rawContent = message.raw || message.content?.raw || '';
+
+  const hasHtml = htmlContent.trim().length > 0;
+  const hasText = textContent.trim().length > 0;
+  const hasRaw = rawContent.trim().length > 0;
+
+  const renderContent = () => {
+    if (hasHtml) {
+      return (
+        <div
+          className="prose prose-sm max-w-none text-foreground [&_a]:text-primary"
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
+      );
+    }
+
+    if (hasText) {
+      return (
+        <pre className="text-sm text-foreground whitespace-pre-wrap break-words">
+          {textContent}
+        </pre>
+      );
+    }
+
+    if (hasRaw) {
+      return (
+        <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words">
+          {rawContent}
+        </pre>
+      );
+    }
+
+    return (
+      <p className="text-muted-foreground italic">No content available</p>
+    );
+  };
 
   return (
     <div className="flex flex-col h-full animate-fade-in">
@@ -116,11 +153,9 @@ export function MessageViewer({
         </div>
       </div>
 
-      {/* Raw Content */}
+      {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words">
-          {rawContent || 'No raw content available'}
-        </pre>
+        {renderContent()}
       </div>
     </div>
   );
