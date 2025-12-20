@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '@/lib/api';
 import type { MessagePreview, Message, ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
@@ -36,11 +36,11 @@ export function useMailApi() {
     messages: false,
     message: false,
     deleting: false,
+    clearingInbox: false,
   });
   const [error, setError] = useState<string | null>(null);
   
   const abortControllerRef = useRef<AbortController | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchDomains = useCallback(async () => {
     setLoading(prev => ({ ...prev, domains: true }));
@@ -161,33 +161,61 @@ export function useMailApi() {
     }
   }, [messages]);
 
+  const clearInbox = useCallback(async (): Promise<boolean> => {
+    setLoading(prev => ({ ...prev, clearingInbox: true }));
+    
+    try {
+      // Delete all messages one by one (or use bulk endpoint if available)
+      const deletePromises = messages.map(m => 
+        apiFetch<ApiResponse<null>>(
+          `/api/v1/messages/${encodeURIComponent(m.id)}`,
+          { method: 'DELETE' }
+        )
+      );
+      
+      const results = await Promise.allSettled(deletePromises);
+      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      
+      if (successCount === messages.length) {
+        setMessages([]);
+        setSelectedMessage(null);
+        toast.success('Inbox cleared');
+        return true;
+      } else if (successCount > 0) {
+        // Partial success - refresh to get current state
+        await fetchMessages();
+        toast.success(`Deleted ${successCount} of ${messages.length} messages`);
+        return true;
+      } else {
+        throw { message: 'Failed to clear inbox', status: 500 };
+      }
+    } catch (err) {
+      const apiErr = err as ApiError;
+      toast.error('Failed to clear inbox');
+      console.error('[Mail] Clear inbox error:', apiErr);
+      return false;
+    } finally {
+      setLoading(prev => ({ ...prev, clearingInbox: false }));
+    }
+  }, [messages, fetchMessages]);
+
   const refreshMessages = useCallback(() => {
     fetchMessages();
     toast.success('Refreshed');
   }, [fetchMessages]);
 
-  // Fetch domains on mount
-  useEffect(() => {
-    fetchDomains();
-  }, [fetchDomains]);
-
-  // Poll messages every 30 seconds and when domain changes
-  useEffect(() => {
-    // Initial fetch
-    fetchMessages();
-
-    // Set up polling
-    pollIntervalRef.current = setInterval(fetchMessages, 30000);
-
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [fetchMessages]);
+  // Get inbox email based on selected domain
+  const getInboxEmail = useCallback((): string | undefined => {
+    if (domains.length === 0) return undefined;
+    
+    // If specific domain selected, use it
+    if (selectedDomain !== ALL_DOMAINS) {
+      return `inbox@${selectedDomain}`;
+    }
+    
+    // Otherwise use first domain
+    return domains[0] ? `inbox@${domains[0]}` : undefined;
+  }, [domains, selectedDomain]);
 
   return {
     domains,
@@ -202,6 +230,10 @@ export function useMailApi() {
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
+    clearInbox,
+    fetchDomains,
+    fetchMessages,
+    getInboxEmail,
     ALL_DOMAINS,
   };
 }

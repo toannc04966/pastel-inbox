@@ -1,4 +1,5 @@
-import { Mail, RefreshCw, LogOut } from 'lucide-react';
+import { Mail, RefreshCw, LogOut, Copy, Check, Pause, Play, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -7,7 +8,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import type { User } from '@/types/auth';
 
 interface TopBarProps {
@@ -16,9 +35,16 @@ interface TopBarProps {
   allDomainsValue: string;
   onDomainChange: (domain: string) => void;
   onRefresh: () => void;
+  onClearInbox?: () => Promise<boolean>;
   loading: boolean;
+  clearingInbox?: boolean;
   user?: User | null;
   onLogout?: () => void;
+  inboxEmail?: string;
+  autoRefreshEnabled?: boolean;
+  autoRefreshPaused?: boolean;
+  onToggleAutoRefresh?: () => void;
+  messageCount?: number;
 }
 
 export function TopBar({
@@ -27,10 +53,42 @@ export function TopBar({
   allDomainsValue,
   onDomainChange,
   onRefresh,
+  onClearInbox,
   loading,
+  clearingInbox = false,
   user,
   onLogout,
+  inboxEmail,
+  autoRefreshEnabled = true,
+  autoRefreshPaused = false,
+  onToggleAutoRefresh,
+  messageCount = 0,
 }: TopBarProps) {
+  const [copied, setCopied] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+
+  const handleCopyEmail = async () => {
+    if (!inboxEmail) return;
+    await navigator.clipboard.writeText(inboxEmail);
+    setCopied(true);
+    toast.success('Email address copied!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleClearInbox = async () => {
+    if (!onClearInbox) return;
+    const success = await onClearInbox();
+    if (success) {
+      setClearDialogOpen(false);
+    }
+  };
+
+  const getAutoRefreshStatus = () => {
+    if (!autoRefreshEnabled) return 'Auto-refresh off';
+    if (autoRefreshPaused) return 'Paused (user active)';
+    return 'Auto-refresh on';
+  };
+
   return (
     <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border/50 bg-card">
       <div className="flex items-center gap-3">
@@ -40,18 +98,44 @@ export function TopBar({
         <div>
           <h1 className="text-lg font-semibold text-foreground">Temp Mail</h1>
           <span className="text-xs text-muted-foreground hidden sm:block">
-            Auto refresh every 30s
+            {getAutoRefreshStatus()}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
+        {/* Inbox Email with Copy */}
+        {inboxEmail && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleCopyEmail}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors cursor-pointer"
+                >
+                  <span className="text-sm text-foreground font-medium truncate max-w-[180px]">
+                    {inboxEmail}
+                  </span>
+                  {copied ? (
+                    <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Click to copy email address</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
         {/* Domain Selector */}
         {loading && domains.length === 0 ? (
-          <Skeleton className="w-40 h-10 rounded-xl" />
+          <Skeleton className="w-32 md:w-40 h-10 rounded-xl" />
         ) : (
           <Select value={selectedDomain} onValueChange={onDomainChange}>
-            <SelectTrigger className="w-[160px] rounded-xl bg-secondary border-0 h-10">
+            <SelectTrigger className="w-[120px] md:w-[160px] rounded-xl bg-secondary border-0 h-10">
               <SelectValue placeholder="Select domain" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
@@ -67,21 +151,89 @@ export function TopBar({
           </Select>
         )}
 
+        {/* Auto-Refresh Toggle */}
+        {onToggleAutoRefresh && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={onToggleAutoRefresh}
+                  variant="outline"
+                  size="icon"
+                  className={`rounded-xl h-10 w-10 ${
+                    autoRefreshEnabled 
+                      ? autoRefreshPaused 
+                        ? 'text-yellow-500' 
+                        : 'text-green-500' 
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  {autoRefreshEnabled ? (
+                    autoRefreshPaused ? (
+                      <Pause className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )
+                  ) : (
+                    <Pause className="w-4 h-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{autoRefreshEnabled ? 'Disable auto-refresh' : 'Enable auto-refresh'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
         {/* Refresh Button */}
         <Button
           onClick={onRefresh}
           disabled={loading}
           variant="outline"
-          className="rounded-xl h-10 px-4"
+          className="rounded-xl h-10 px-3 md:px-4"
         >
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="hidden md:inline ml-2">Refresh</span>
         </Button>
+
+        {/* Clear Inbox Button */}
+        {onClearInbox && messageCount > 0 && (
+          <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="rounded-xl h-10 px-3 md:px-4 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                disabled={clearingInbox}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden md:inline ml-2">Clear</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear inbox?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete all {messageCount} messages. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleClearInbox}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {clearingInbox ? 'Clearing...' : 'Clear All'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         {/* User & Logout */}
         {user && (
-          <div className="flex items-center gap-2 ml-1 pl-3 border-l border-border/50">
-            <span className="text-sm text-muted-foreground hidden md:inline truncate max-w-32">
+          <div className="flex items-center gap-2 ml-1 pl-2 md:pl-3 border-l border-border/50">
+            <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-32">
               {user.email}
             </span>
             <Button

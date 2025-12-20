@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useReadState } from '@/hooks/useReadState';
+import { useSmartRefresh } from '@/hooks/useSmartRefresh';
 import { TopBar } from '@/components/TopBar';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
@@ -15,6 +17,7 @@ const Inbox = () => {
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
   
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     domains,
@@ -29,8 +32,29 @@ const Inbox = () => {
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
+    clearInbox,
+    fetchDomains,
+    fetchMessages,
+    getInboxEmail,
     ALL_DOMAINS,
   } = useMailApi();
+
+  const { isRead, markAsRead, markAsUnread, clearReadState } = useReadState();
+  
+  const { autoRefreshEnabled, toggleAutoRefresh, isPaused } = useSmartRefresh(
+    fetchMessages,
+    30000
+  );
+
+  // Fetch domains on mount
+  useEffect(() => {
+    fetchDomains();
+  }, [fetchDomains]);
+
+  // Fetch messages when domain changes
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -41,6 +65,7 @@ const Inbox = () => {
 
   const handleSelectMessage = (id: string) => {
     fetchMessage(id);
+    markAsRead(id);
     if (isMobile) {
       setMobileView('viewer');
     }
@@ -49,6 +74,18 @@ const Inbox = () => {
   const handleBackToList = () => {
     setMobileView('list');
     setSelectedMessage(null);
+  };
+
+  const handleMarkAsUnread = (id: string) => {
+    markAsUnread(id);
+  };
+
+  const handleClearInbox = async (): Promise<boolean> => {
+    const success = await clearInbox();
+    if (success) {
+      clearReadState();
+    }
+    return success;
   };
 
   // Show loading skeleton while checking auth
@@ -72,6 +109,8 @@ const Inbox = () => {
     return null;
   }
 
+  const inboxEmail = getInboxEmail();
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar
@@ -80,9 +119,16 @@ const Inbox = () => {
         allDomainsValue={ALL_DOMAINS}
         onDomainChange={handleDomainChange}
         onRefresh={refreshMessages}
+        onClearInbox={handleClearInbox}
         loading={loading.messages || loading.domains}
+        clearingInbox={loading.clearingInbox}
         user={user}
         onLogout={logout}
+        inboxEmail={inboxEmail}
+        autoRefreshEnabled={autoRefreshEnabled}
+        autoRefreshPaused={isPaused}
+        onToggleAutoRefresh={toggleAutoRefresh}
+        messageCount={messages.length}
       />
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -99,6 +145,9 @@ const Inbox = () => {
                   selectedId={selectedMessage?.id || null}
                   onSelect={handleSelectMessage}
                   loading={loading.messages}
+                  isRead={isRead}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
                 />
               ) : (
                 <MessageViewer
@@ -107,6 +156,7 @@ const Inbox = () => {
                   deleting={loading.deleting}
                   onBack={handleBackToList}
                   onDelete={deleteMessage}
+                  onMarkAsUnread={handleMarkAsUnread}
                   showBackButton
                 />
               )}
@@ -120,6 +170,9 @@ const Inbox = () => {
                   selectedId={selectedMessage?.id || null}
                   onSelect={handleSelectMessage}
                   loading={loading.messages}
+                  isRead={isRead}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
                 />
               </div>
               <div className="flex-1 overflow-hidden">
@@ -128,6 +181,7 @@ const Inbox = () => {
                   loading={loading.message}
                   deleting={loading.deleting}
                   onDelete={deleteMessage}
+                  onMarkAsUnread={handleMarkAsUnread}
                 />
               </div>
             </div>

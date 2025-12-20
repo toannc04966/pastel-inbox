@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Check, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Message } from '@/types/mail';
@@ -28,6 +33,7 @@ interface MessageViewerProps {
   deleting?: boolean;
   onBack?: () => void;
   onDelete?: (id: string) => Promise<boolean>;
+  onMarkAsUnread?: (id: string) => void;
   showBackButton?: boolean;
 }
 
@@ -52,10 +58,12 @@ export function MessageViewer({
   deleting = false,
   onBack,
   onDelete,
+  onMarkAsUnread,
   showBackButton,
 }: MessageViewerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showHeaders, setShowHeaders] = useState(false);
 
   const handleDelete = async () => {
     if (!message || !onDelete) return;
@@ -95,6 +103,70 @@ export function MessageViewer({
     }
   };
 
+  const downloadRawEmail = () => {
+    if (!message) return;
+    
+    const rawContent = message.raw || message.content?.raw;
+    if (!rawContent) {
+      toast.error('Raw email not available');
+      return;
+    }
+
+    const blob = new Blob([rawContent], { type: 'message/rfc822' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Generate filename from subject or message ID
+    const safeSubject = (message.subject || 'message')
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .substring(0, 50);
+    a.download = `${safeSubject}_${message.id}.eml`;
+    
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Email downloaded');
+  };
+
+  const hasRawContent = message && (message.raw || message.content?.raw);
+
+  // Extract headers from raw content
+  const extractHeaders = (rawContent: string): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    const headerSection = rawContent.split('\r\n\r\n')[0] || rawContent.split('\n\n')[0];
+    const lines = headerSection.split(/\r?\n/);
+    
+    let currentKey = '';
+    let currentValue = '';
+    
+    for (const line of lines) {
+      if (line.startsWith(' ') || line.startsWith('\t')) {
+        // Continuation of previous header
+        currentValue += ' ' + line.trim();
+      } else {
+        // Save previous header
+        if (currentKey) {
+          headers[currentKey] = currentValue;
+        }
+        // Parse new header
+        const colonIndex = line.indexOf(':');
+        if (colonIndex > 0) {
+          currentKey = line.substring(0, colonIndex).trim();
+          currentValue = line.substring(colonIndex + 1).trim();
+        }
+      }
+    }
+    // Save last header
+    if (currentKey) {
+      headers[currentKey] = currentValue;
+    }
+    
+    return headers;
+  };
+
   if (!message && !loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 px-6">
@@ -122,6 +194,8 @@ export function MessageViewer({
   const hasHtml = htmlContent.trim().length > 0;
   const hasText = textContent.trim().length > 0;
   const hasRaw = rawContent.trim().length > 0;
+
+  const headers = hasRaw ? extractHeaders(rawContent) : {};
 
   const renderContent = () => {
     if (hasHtml) {
@@ -217,42 +291,118 @@ export function MessageViewer({
             </div>
           </div>
 
-          {onDelete && (
-            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                  disabled={deleting}
-                >
-                  {deleting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4" />
-                  )}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Mark as Unread */}
+            {onMarkAsUnread && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onMarkAsUnread(message.id)}
+                      className="h-8 w-8 rounded-lg"
+                    >
+                      <MailOpen className="w-4 h-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Mark as unread</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
+            {/* Download Raw Email */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={downloadRawEmail}
+                    className="h-8 w-8 rounded-lg"
+                    disabled={!hasRawContent}
                   >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Download className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{hasRawContent ? 'Download raw email (.eml)' : 'Raw email not available'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Delete */}
+            {onDelete && (
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
+
+        {/* Email Headers (Collapsible) */}
+        {hasRaw && Object.keys(headers).length > 0 && (
+          <Collapsible open={showHeaders} onOpenChange={setShowHeaders} className="mt-3">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground">
+                {showHeaders ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
+                {showHeaders ? 'Hide' : 'Show'} headers
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="bg-secondary rounded-lg p-3 text-xs font-mono space-y-1 max-h-48 overflow-auto">
+                {headers['Message-ID'] && (
+                  <div><span className="text-muted-foreground">Message-ID:</span> {headers['Message-ID']}</div>
+                )}
+                {headers['Received'] && (
+                  <div className="truncate"><span className="text-muted-foreground">Received:</span> {headers['Received']}</div>
+                )}
+                {headers['Authentication-Results'] && (
+                  <div className="truncate"><span className="text-muted-foreground">Auth:</span> {headers['Authentication-Results']}</div>
+                )}
+                {headers['DKIM-Signature'] && (
+                  <div className="truncate"><span className="text-muted-foreground">DKIM:</span> Present</div>
+                )}
+                {headers['X-Spam-Status'] && (
+                  <div><span className="text-muted-foreground">Spam:</span> {headers['X-Spam-Status']}</div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
       </div>
 
       {/* Content */}
