@@ -54,6 +54,9 @@ const translations = {
     copiedToClipboard: 'Copied to clipboard',
     emailDownloaded: 'Email downloaded',
     
+    // Attachments
+    attachments: 'Attachments',
+    
     // Theme
     darkMode: 'Dark mode',
     lightMode: 'Light mode',
@@ -151,6 +154,9 @@ const translations = {
     copied: 'Đã sao chép!',
     copiedToClipboard: 'Đã sao chép',
     emailDownloaded: 'Đã tải email',
+    
+    // Attachments
+    attachments: 'Tệp đính kèm',
     
     // Theme
     darkMode: 'Chế độ tối',

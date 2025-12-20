@@ -19,6 +19,13 @@ export interface MessageContent {
   raw?: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+}
+
 export interface Message {
   id: string;
   inboxId: string;
@@ -30,6 +37,7 @@ export interface Message {
   html?: string;
   text?: string;
   raw?: string;
+  attachments?: Attachment[];
 }
 
 export interface ApiResponse<T> {
