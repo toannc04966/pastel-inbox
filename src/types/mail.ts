@@ -23,6 +23,7 @@ export interface Message {
   id: string;
   inboxId: string;
   from: string;
+  to?: string | string[];
   subject: string;
   receivedAt: string;
   content?: MessageContent;

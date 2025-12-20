@@ -1,6 +1,23 @@
-import { ArrowLeft, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Trash2, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Message } from '@/types/mail';
@@ -8,7 +25,9 @@ import type { Message } from '@/types/mail';
 interface MessageViewerProps {
   message: Message | null;
   loading: boolean;
+  deleting?: boolean;
   onBack?: () => void;
+  onDelete?: (id: string) => Promise<boolean>;
   showBackButton?: boolean;
 }
 
@@ -30,10 +49,35 @@ function SkeletonViewer() {
 export function MessageViewer({
   message,
   loading,
+  deleting = false,
   onBack,
+  onDelete,
   showBackButton,
 }: MessageViewerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const handleDelete = async () => {
+    if (!message || !onDelete) return;
+    const success = await onDelete(message.id);
+    if (success) {
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const formatRecipients = (to: string | string[] | undefined): string => {
+    if (!to) return '(unknown)';
+    if (typeof to === 'string') return to;
+    if (Array.isArray(to) && to.length === 0) return '(unknown)';
+    if (to.length === 1) return to[0];
+    return `${to[0]} (+${to.length - 1})`;
+  };
+
+  const getFullRecipients = (to: string | string[] | undefined): string => {
+    if (!to) return '(unknown)';
+    if (typeof to === 'string') return to;
+    return to.join(', ');
+  };
 
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
@@ -113,43 +157,101 @@ export function MessageViewer({
   return (
     <div className="flex flex-col h-full animate-fade-in">
       {/* Header */}
-      <div className="p-6 border-b border-border/50">
-        {showBackButton && (
-          <Button
-            variant="ghost"
-            onClick={onBack}
-            className="mb-4 -ml-2 rounded-xl text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to inbox
-          </Button>
-        )}
+      <div className="p-4 border-b border-border/50">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            {showBackButton && (
+              <Button
+                variant="ghost"
+                onClick={onBack}
+                className="mb-3 -ml-2 rounded-lg text-muted-foreground hover:text-foreground h-8 px-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1.5" />
+                Back
+              </Button>
+            )}
 
-        <h2 className="text-xl font-semibold text-foreground mb-3">
-          {message.subject || '(No subject)'}
-        </h2>
+            <h2 className="text-lg font-semibold text-foreground mb-2 truncate" title={message.subject || '(No subject)'}>
+              {message.subject || '(No subject)'}
+            </h2>
 
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">From:</span>
-            <span className="text-sm font-medium text-foreground">{message.from}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => copyToClipboard(message.from, 'from')}
-              className="h-6 w-6 rounded-lg"
-            >
-              {copiedField === 'from' ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[13px]">
+                <span className="text-muted-foreground shrink-0">From:</span>
+                <span className="font-medium text-foreground truncate">{message.from}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => copyToClipboard(message.from, 'from')}
+                  className="h-5 w-5 rounded shrink-0"
+                >
+                  {copiedField === 'from' ? (
+                    <Check className="w-3 h-3" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-2 text-[13px]">
+                <span className="text-muted-foreground shrink-0">To:</span>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="font-medium text-foreground truncate cursor-default">
+                        {formatRecipients(message.to)}
+                      </span>
+                    </TooltipTrigger>
+                    {Array.isArray(message.to) && message.to.length > 1 && (
+                      <TooltipContent>
+                        <p className="max-w-xs break-all">{getFullRecipients(message.to)}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+
+              <div className="text-[12px] text-muted-foreground">
+                {formatTime(message.receivedAt)}
+              </div>
+            </div>
           </div>
 
-          <span className="text-sm text-muted-foreground">
-            {formatTime(message.receivedAt)}
-          </span>
+          {onDelete && (
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
