@@ -253,18 +253,6 @@ export function MessageViewer({
               <div className="flex items-center gap-2 text-[13px]">
                 <span className="text-muted-foreground shrink-0">From:</span>
                 <span className="font-medium text-foreground truncate">{message.from}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => copyToClipboard(message.from, 'from')}
-                  className="h-5 w-5 rounded shrink-0"
-                >
-                  {copiedField === 'from' ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <Copy className="w-3 h-3" />
-                  )}
-                </Button>
               </div>
 
               <div className="flex items-center gap-2 text-[13px]">
@@ -283,6 +271,23 @@ export function MessageViewer({
                     )}
                   </Tooltip>
                 </TooltipProvider>
+                {message.to && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const firstRecipient = Array.isArray(message.to) ? message.to[0] : message.to;
+                      if (firstRecipient) copyToClipboard(firstRecipient, 'to');
+                    }}
+                    className="h-5 w-5 rounded shrink-0"
+                  >
+                    {copiedField === 'to' ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </Button>
+                )}
               </div>
 
               <div className="text-[12px] text-muted-foreground">

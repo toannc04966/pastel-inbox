@@ -1,4 +1,4 @@
-import { Mail, RefreshCw, LogOut, Copy, Check, Pause, Play, Trash2 } from 'lucide-react';
+import { Mail, RefreshCw, LogOut, Pause, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -64,16 +64,7 @@ export function TopBar({
   onToggleAutoRefresh,
   messageCount = 0,
 }: TopBarProps) {
-  const [copied, setCopied] = useState(false);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
-
-  const handleCopyEmail = async () => {
-    if (!inboxEmail) return;
-    await navigator.clipboard.writeText(inboxEmail);
-    setCopied(true);
-    toast.success('Email address copied!');
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   const handleClearInbox = async () => {
     if (!onClearInbox) return;
@@ -104,30 +95,13 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Inbox Email with Copy */}
+        {/* Inbox Email (Display Only) */}
         {inboxEmail && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleCopyEmail}
-                  className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors cursor-pointer"
-                >
-                  <span className="text-sm text-foreground font-medium truncate max-w-[180px]">
-                    {inboxEmail}
-                  </span>
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  )}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Click to copy email address</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="hidden md:flex items-center px-3 py-1.5 rounded-lg bg-secondary">
+            <span className="text-sm text-foreground font-medium truncate max-w-[180px]">
+              {inboxEmail}
+            </span>
+          </div>
         )}
 
         {/* Domain Selector */}
