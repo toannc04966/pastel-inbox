@@ -5,6 +5,7 @@ import { useMailApi } from '@/hooks/useMailApi';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useReadState } from '@/hooks/useReadState';
 import { useSmartRefresh } from '@/hooks/useSmartRefresh';
+import { useTheme } from '@/contexts/ThemeContext';
 import { TopBar } from '@/components/TopBar';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
@@ -15,6 +16,7 @@ const Inbox = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
+  const { setDomainAccent } = useTheme();
   
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +29,7 @@ const Inbox = () => {
     loading,
     error,
     setError,
-    handleDomainChange,
+    handleDomainChange: originalHandleDomainChange,
     fetchMessage,
     setSelectedMessage,
     refreshMessages,
@@ -46,6 +48,12 @@ const Inbox = () => {
     30000
   );
 
+  // Wrap domain change to update accent color
+  const handleDomainChange = (domain: string) => {
+    originalHandleDomainChange(domain);
+    setDomainAccent(domain);
+  };
+
   // Fetch domains on mount
   useEffect(() => {
     fetchDomains();
@@ -55,6 +63,11 @@ const Inbox = () => {
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
+
+  // Set initial domain accent
+  useEffect(() => {
+    setDomainAccent(selectedDomain);
+  }, [selectedDomain, setDomainAccent]);
 
   // Redirect if not authenticated
   useEffect(() => {

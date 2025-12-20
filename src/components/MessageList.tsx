@@ -2,6 +2,7 @@ import { Search, Inbox } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { MessagePreview } from '@/types/mail';
 
 interface MessageListProps {
@@ -34,6 +35,7 @@ export function MessageList({
   onSearchChange,
 }: MessageListProps) {
   const [internalSearch, setInternalSearch] = useState('');
+  const { t } = useLanguage();
   
   // Use external search if provided, otherwise internal
   const search = externalSearch !== undefined ? externalSearch : internalSearch;
@@ -72,14 +74,14 @@ export function MessageList({
   return (
     <div className="flex flex-col h-full">
       {/* Search Input */}
-      <div className="px-3 py-2.5 border-b border-border/50">
+      <div className="px-3 py-2.5 border-b border-border/50 theme-transition">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search sender, subject, content..."
+            placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 rounded-lg bg-secondary border-0 h-8 text-sm"
+            className="pl-9 rounded-lg bg-secondary border-0 h-8 text-sm theme-transition"
           />
         </div>
       </div>
@@ -94,11 +96,11 @@ export function MessageList({
           </div>
         ) : filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 px-4">
-            <div className="w-12 h-12 rounded-xl bg-pastel-cream flex items-center justify-center mb-3">
+            <div className="w-12 h-12 rounded-xl bg-pastel-cream flex items-center justify-center mb-3 theme-transition">
               <Inbox className="w-6 h-6 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground text-center">
-              {search ? 'No messages match your search' : 'Waiting for incoming emails…'}
+              {search ? t('noMessagesMatch') : t('waitingForEmails')}
             </p>
           </div>
         ) : (
@@ -110,10 +112,10 @@ export function MessageList({
                 <button
                   key={message.id}
                   onClick={() => onSelect(message.id)}
-                  className={`w-full text-left px-3 py-2 transition-all hover:bg-secondary/50 ${
+                  className={`w-full text-left px-3 py-2 message-hover theme-transition ${
                     selectedId === message.id ? 'message-selected' : ''
                   }`}
-                  title={`From: ${message.from}\nSubject: ${message.subject || '(No subject)'}`}
+                  title={`${t('from')} ${message.from}\n${message.subject || t('noSubject')}`}
                 >
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
                     <span className={`text-[13px] truncate max-w-[180px] ${
@@ -132,7 +134,7 @@ export function MessageList({
                       ? 'font-normal text-muted-foreground' 
                       : 'font-semibold text-foreground'
                   }`}>
-                    {message.subject || '(No subject)'}
+                    {message.subject || t('noSubject')}
                   </p>
                   {message.preview && (
                     <p className="text-[11px] text-muted-foreground truncate">
@@ -140,7 +142,7 @@ export function MessageList({
                     </p>
                   )}
                   {!messageIsRead && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-primary mt-1" />
+                    <span className="inline-block w-2 h-2 rounded-full bg-primary mt-1 theme-transition" />
                   )}
                 </button>
               );
