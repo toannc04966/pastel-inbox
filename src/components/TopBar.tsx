@@ -95,15 +95,6 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Inbox Email (Display Only) */}
-        {inboxEmail && (
-          <div className="hidden md:flex items-center px-3 py-1.5 rounded-lg bg-secondary">
-            <span className="text-sm text-foreground font-medium truncate max-w-[180px]">
-              {inboxEmail}
-            </span>
-          </div>
-        )}
-
         {/* Domain Selector */}
         {loading && domains.length === 0 ? (
           <Skeleton className="w-32 md:w-40 h-10 rounded-xl" />
