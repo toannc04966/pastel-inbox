@@ -1,4 +1,4 @@
-import { Mail, RefreshCw, LogOut, Pause, Play, Trash2 } from 'lucide-react';
+import { Mail, RefreshCw, Pause, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +28,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { AccountMenu } from '@/components/AccountMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { User } from '@/types/auth';
 
@@ -204,30 +205,10 @@ export function TopBar({
         {/* Language Toggle */}
         <LanguageToggle />
 
-        {/* User & Logout */}
-        {user && (
-          <div className="flex items-center gap-2 ml-1 pl-2 md:pl-3 border-l border-border/50">
-            <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-32">
-              {user.email}
-            </span>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onLogout}
-                    className="h-10 w-10 rounded-xl hover:bg-destructive/20 theme-transition"
-                    title={t('logout')}
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t('logout')}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+        {/* User & Account Menu */}
+        {user && onLogout && (
+          <div className="ml-1 pl-2 md:pl-3 border-l border-border/50">
+            <AccountMenu user={user} onLogout={onLogout} />
           </div>
         )}
       </div>
