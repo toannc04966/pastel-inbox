@@ -1,5 +1,6 @@
 import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen, Paperclip, FileText } from 'lucide-react';
 import { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -27,6 +28,11 @@ import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Message } from '@/types/mail';
+
+// Helper to sanitize HTML content
+const sanitizeHtml = (html: string): string => {
+  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+};
 
 interface MessageViewerProps {
   message: Message | null;
@@ -188,35 +194,64 @@ export function MessageViewer({
 
   if (!message) return null;
 
-  // Determine content to display: prefer html > text > raw
-  const htmlContent = message.html || message.content?.html || '';
-  const textContent = message.text || message.content?.text || '';
+  // Check new API fields first, then fallback to legacy fields
+  const isHtmlEmail = message.is_html === true && !!message.content_html?.trim();
+  const contentHtml = message.content_html || '';
+  const contentText = message.content_text || '';
+  
+  // Legacy fallbacks
+  const legacyHtml = message.html || message.content?.html || '';
+  const legacyText = message.text || message.content?.text || '';
   const rawContent = message.raw || message.content?.raw || '';
 
-  const hasHtml = htmlContent.trim().length > 0;
-  const hasText = textContent.trim().length > 0;
+  const hasLegacyHtml = legacyHtml.trim().length > 0;
+  const hasLegacyText = legacyText.trim().length > 0;
   const hasRaw = rawContent.trim().length > 0;
 
   const headers = hasRaw ? extractHeaders(rawContent) : {};
 
   const renderContent = () => {
-    if (hasHtml) {
+    // Priority 1: New API with is_html flag
+    if (isHtmlEmail) {
+      const sanitized = sanitizeHtml(contentHtml);
       return (
         <div
-          className="prose prose-sm max-w-none text-foreground [&_a]:text-primary"
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
+          className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80 [&_img]:max-w-full [&_img]:h-auto"
+          dangerouslySetInnerHTML={{ __html: sanitized }}
         />
       );
     }
 
-    if (hasText) {
+    // Priority 2: New API plain text
+    if (contentText.trim()) {
       return (
-        <pre className="text-sm text-foreground whitespace-pre-wrap break-words">
-          {textContent}
-        </pre>
+        <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+          {contentText}
+        </div>
       );
     }
 
+    // Priority 3: Legacy HTML (sanitize it too)
+    if (hasLegacyHtml) {
+      const sanitized = sanitizeHtml(legacyHtml);
+      return (
+        <div
+          className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80 [&_img]:max-w-full [&_img]:h-auto"
+          dangerouslySetInnerHTML={{ __html: sanitized }}
+        />
+      );
+    }
+
+    // Priority 4: Legacy plain text
+    if (hasLegacyText) {
+      return (
+        <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+          {legacyText}
+        </div>
+      );
+    }
+
+    // Priority 5: Raw content (never rendered as HTML)
     if (hasRaw) {
       return (
         <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words theme-transition">
