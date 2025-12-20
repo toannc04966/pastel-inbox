@@ -6,116 +6,153 @@
 
 @layer base {
   :root {
-    /* Soft pastel palette - iOS/Notion inspired */
-    --background: 240 20% 98%;
-    --foreground: 240 10% 20%;
+    /* Domain accent (dynamically set via JS) */
+    --domain-accent-hue: 250;
+    --domain-accent: var(--domain-accent-hue) 55% 65%;
+    --domain-accent-light: var(--domain-accent-hue) 60% 85%;
+    --domain-accent-dark: var(--domain-accent-hue) 50% 55%;
+
+    /* Light Pastel palette - improved contrast */
+    --background: 240 20% 97%;
+    --foreground: 240 15% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 20%;
+    --card-foreground: 240 15% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 20%;
+    --popover-foreground: 240 15% 15%;
 
-    /* Soft lilac primary */
-    --primary: 250 60% 75%;
-    --primary-foreground: 250 60% 20%;
+    /* Primary using domain accent */
+    --primary: var(--domain-accent);
+    --primary-foreground: 0 0% 100%;
 
-    /* Light lavender secondary */
-    --secondary: 250 30% 95%;
-    --secondary-foreground: 250 40% 35%;
+    /* Light lavender secondary - improved contrast */
+    --secondary: 240 20% 93%;
+    --secondary-foreground: 240 20% 30%;
 
-    /* Soft muted tones */
-    --muted: 240 15% 94%;
-    --muted-foreground: 240 10% 50%;
+    /* Soft muted tones - improved contrast */
+    --muted: 240 15% 91%;
+    --muted-foreground: 240 10% 40%;
 
     /* Mint accent */
-    --accent: 165 50% 88%;
-    --accent-foreground: 165 50% 25%;
+    --accent: 165 45% 85%;
+    --accent-foreground: 165 50% 20%;
 
-    /* Soft pastel red for errors */
-    --destructive: 0 60% 85%;
-    --destructive-foreground: 0 60% 30%;
+    /* Soft pastel red for errors - improved contrast */
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 20% 90%;
-    --input: 240 20% 92%;
-    --ring: 250 60% 75%;
+    --border: 240 15% 85%;
+    --input: 240 15% 90%;
+    --ring: var(--domain-accent);
 
     --radius: 1rem;
 
     /* Custom pastel tokens */
-    --pastel-blue: 220 80% 90%;
-    --pastel-lilac: 270 60% 92%;
-    --pastel-mint: 165 50% 90%;
-    --pastel-peach: 20 80% 92%;
-    --pastel-cream: 40 40% 97%;
+    --pastel-blue: 220 70% 88%;
+    --pastel-lilac: 270 55% 90%;
+    --pastel-mint: 165 45% 88%;
+    --pastel-peach: 20 75% 90%;
+    --pastel-cream: 40 35% 95%;
     
-    /* Message selected state */
-    --selected: 250 50% 96%;
-    --selected-accent: 250 60% 75%;
+    /* Message selected state - uses domain accent */
+    --selected: var(--domain-accent-hue) 40% 94%;
+    --selected-accent: var(--domain-accent);
+
+    /* Hover state - distinct from selected */
+    --hover: 240 15% 95%;
 
     /* Sidebar tokens */
     --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 10% 20%;
-    --sidebar-primary: 250 60% 75%;
-    --sidebar-primary-foreground: 250 60% 20%;
-    --sidebar-accent: 250 30% 95%;
-    --sidebar-accent-foreground: 250 40% 35%;
-    --sidebar-border: 240 20% 92%;
-    --sidebar-ring: 250 60% 75%;
+    --sidebar-foreground: 240 15% 15%;
+    --sidebar-primary: var(--domain-accent);
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 20% 93%;
+    --sidebar-accent-foreground: 240 20% 30%;
+    --sidebar-border: 240 15% 88%;
+    --sidebar-ring: var(--domain-accent);
   }
 
   .dark {
-    --background: 240 15% 10%;
-    --foreground: 240 10% 95%;
+    /* Dark Pastel palette - soft dark, NOT pure black */
+    --background: 240 12% 12%;
+    --foreground: 240 10% 92%;
 
-    --card: 240 15% 13%;
-    --card-foreground: 240 10% 95%;
+    --card: 240 12% 15%;
+    --card-foreground: 240 10% 92%;
 
-    --popover: 240 15% 13%;
-    --popover-foreground: 240 10% 95%;
+    --popover: 240 12% 15%;
+    --popover-foreground: 240 10% 92%;
 
-    --primary: 250 50% 70%;
-    --primary-foreground: 250 60% 10%;
+    /* Primary - brighter in dark mode */
+    --primary: var(--domain-accent-hue) 50% 65%;
+    --primary-foreground: 240 12% 10%;
 
-    --secondary: 240 15% 18%;
+    /* Dark secondary */
+    --secondary: 240 12% 20%;
     --secondary-foreground: 240 10% 85%;
 
-    --muted: 240 15% 20%;
-    --muted-foreground: 240 10% 60%;
+    /* Muted - visible in dark */
+    --muted: 240 12% 22%;
+    --muted-foreground: 240 10% 55%;
 
-    --accent: 165 40% 25%;
-    --accent-foreground: 165 40% 90%;
+    /* Accent in dark */
+    --accent: 165 35% 28%;
+    --accent-foreground: 165 35% 90%;
 
-    --destructive: 0 50% 35%;
-    --destructive-foreground: 0 50% 95%;
+    /* Destructive - visible in dark */
+    --destructive: 0 55% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 15% 20%;
-    --input: 240 15% 20%;
-    --ring: 250 50% 70%;
+    --border: 240 12% 22%;
+    --input: 240 12% 22%;
+    --ring: var(--domain-accent-hue) 50% 65%;
 
-    --pastel-blue: 220 40% 25%;
-    --pastel-lilac: 270 30% 25%;
-    --pastel-mint: 165 30% 20%;
-    --pastel-peach: 20 40% 25%;
-    --pastel-cream: 40 20% 15%;
+    /* Pastel colors adjusted for dark */
+    --pastel-blue: 220 35% 28%;
+    --pastel-lilac: 270 28% 28%;
+    --pastel-mint: 165 28% 22%;
+    --pastel-peach: 20 35% 28%;
+    --pastel-cream: 40 18% 18%;
     
-    --selected: 250 30% 18%;
-    --selected-accent: 250 50% 60%;
+    /* Selected state in dark */
+    --selected: var(--domain-accent-hue) 25% 20%;
+    --selected-accent: var(--domain-accent-hue) 50% 60%;
 
-    --sidebar-background: 240 15% 10%;
-    --sidebar-foreground: 240 10% 95%;
-    --sidebar-primary: 250 50% 70%;
-    --sidebar-primary-foreground: 250 60% 10%;
-    --sidebar-accent: 240 15% 18%;
+    /* Hover state in dark */
+    --hover: 240 12% 18%;
+
+    /* Sidebar in dark */
+    --sidebar-background: 240 12% 12%;
+    --sidebar-foreground: 240 10% 92%;
+    --sidebar-primary: var(--domain-accent-hue) 50% 65%;
+    --sidebar-primary-foreground: 240 12% 10%;
+    --sidebar-accent: 240 12% 20%;
     --sidebar-accent-foreground: 240 10% 85%;
-    --sidebar-border: 240 15% 20%;
-    --sidebar-ring: 250 50% 70%;
+    --sidebar-border: 240 12% 22%;
+    --sidebar-ring: var(--domain-accent-hue) 50% 65%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+  }
+
+  /* Smooth theme transition - respects reduced motion */
+  html {
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      transition: none;
+    }
+    
+    * {
+      transition-duration: 0ms !important;
+      animation-duration: 0ms !important;
+    }
   }
 
   body {
@@ -127,6 +164,7 @@
 @layer utilities {
   .pastel-card {
     @apply bg-card rounded-2xl border border-border/50;
+    transition: background-color 150ms ease, border-color 150ms ease;
   }
 
   .pastel-input {
@@ -144,6 +182,30 @@
   }
 
   .message-selected {
-    @apply bg-selected border-l-2 border-l-selected-accent;
+    @apply bg-selected border-l-2;
+    border-left-color: hsl(var(--selected-accent));
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+
+  .message-hover {
+    transition: background-color 150ms ease;
+  }
+
+  .message-hover:hover {
+    background-color: hsl(var(--hover));
+  }
+
+  /* Theme transition for all interactive elements */
+  .theme-transition {
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .theme-transition,
+    .message-selected,
+    .message-hover,
+    .pastel-card {
+      transition: none;
+    }
   }
 }

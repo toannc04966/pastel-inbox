@@ -26,7 +26,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toast } from 'sonner';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { User } from '@/types/auth';
 
 interface TopBarProps {
@@ -65,6 +67,7 @@ export function TopBar({
   messageCount = 0,
 }: TopBarProps) {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const { t } = useLanguage();
 
   const handleClearInbox = async () => {
     if (!onClearInbox) return;
@@ -75,16 +78,16 @@ export function TopBar({
   };
 
   const getAutoRefreshStatus = () => {
-    if (!autoRefreshEnabled) return 'Auto-refresh off';
-    if (autoRefreshPaused) return 'Paused (user active)';
-    return 'Auto-refresh on';
+    if (!autoRefreshEnabled) return t('autoRefreshOff');
+    if (autoRefreshPaused) return t('pausedUserActive');
+    return t('autoRefreshOn');
   };
 
   return (
-    <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border/50 bg-card">
+    <header className="h-16 px-4 md:px-6 flex items-center justify-between border-b border-border/50 bg-card theme-transition">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center">
-          <Mail className="w-5 h-5 text-primary-foreground" />
+        <div className="w-9 h-9 rounded-xl bg-primary/20 flex items-center justify-center theme-transition">
+          <Mail className="w-5 h-5 text-primary" />
         </div>
         <div>
           <h1 className="text-lg font-semibold text-foreground">Temp Mail</h1>
@@ -100,12 +103,12 @@ export function TopBar({
           <Skeleton className="w-32 md:w-40 h-10 rounded-xl" />
         ) : (
           <Select value={selectedDomain} onValueChange={onDomainChange}>
-            <SelectTrigger className="w-[120px] md:w-[160px] rounded-xl bg-secondary border-0 h-10">
-              <SelectValue placeholder="Select domain" />
+            <SelectTrigger className="w-[120px] md:w-[160px] rounded-xl bg-secondary border-0 h-10 theme-transition">
+              <SelectValue placeholder={t('selectDomain')} />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem value={allDomainsValue} className="rounded-lg">
-                All domains
+                {t('allDomains')}
               </SelectItem>
               {domains.map((domain) => (
                 <SelectItem key={domain} value={domain} className="rounded-lg">
@@ -125,7 +128,7 @@ export function TopBar({
                   onClick={onToggleAutoRefresh}
                   variant="outline"
                   size="icon"
-                  className={`rounded-xl h-10 w-10 ${
+                  className={`rounded-xl h-10 w-10 theme-transition ${
                     autoRefreshEnabled 
                       ? autoRefreshPaused 
                         ? 'text-yellow-500' 
@@ -145,7 +148,7 @@ export function TopBar({
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p>{autoRefreshEnabled ? 'Disable auto-refresh' : 'Enable auto-refresh'}</p>
+                <p>{autoRefreshEnabled ? t('disableAutoRefresh') : t('enableAutoRefresh')}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -156,10 +159,10 @@ export function TopBar({
           onClick={onRefresh}
           disabled={loading}
           variant="outline"
-          className="rounded-xl h-10 px-3 md:px-4"
+          className="rounded-xl h-10 px-3 md:px-4 theme-transition"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span className="hidden md:inline ml-2">Refresh</span>
+          <span className="hidden md:inline ml-2">{t('refresh')}</span>
         </Button>
 
         {/* Clear Inbox Button */}
@@ -168,32 +171,38 @@ export function TopBar({
             <AlertDialogTrigger asChild>
               <Button
                 variant="outline"
-                className="rounded-xl h-10 px-3 md:px-4 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                className="rounded-xl h-10 px-3 md:px-4 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 theme-transition"
                 disabled={clearingInbox}
               >
                 <Trash2 className="w-4 h-4" />
-                <span className="hidden md:inline ml-2">Clear</span>
+                <span className="hidden md:inline ml-2">{t('clear')}</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Clear inbox?</AlertDialogTitle>
+                <AlertDialogTitle>{t('clearInboxQuestion')}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will delete all {messageCount} messages. This action cannot be undone.
+                  {t('clearInboxDescription', { count: messageCount })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleClearInbox}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
-                  {clearingInbox ? 'Clearing...' : 'Clear All'}
+                  {clearingInbox ? t('clearing') : t('clearAll')}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         )}
+
+        {/* Theme Toggle */}
+        <ThemeToggle />
+
+        {/* Language Toggle */}
+        <LanguageToggle />
 
         {/* User & Logout */}
         {user && (
@@ -201,15 +210,24 @@ export function TopBar({
             <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-32">
               {user.email}
             </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onLogout}
-              className="h-10 w-10 rounded-xl hover:bg-destructive/20"
-              title="Logout"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onLogout}
+                    className="h-10 w-10 rounded-xl hover:bg-destructive/20 theme-transition"
+                    title={t('logout')}
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('logout')}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )}
       </div>

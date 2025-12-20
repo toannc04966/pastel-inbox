@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
+import { useLanguage } from '@/contexts/LanguageContext';
 import type { Message } from '@/types/mail';
 
 interface MessageViewerProps {
@@ -64,6 +65,7 @@ export function MessageViewer({
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showHeaders, setShowHeaders] = useState(false);
+  const { t } = useLanguage();
 
   const handleDelete = async () => {
     if (!message || !onDelete) return;
@@ -90,7 +92,7 @@ export function MessageViewer({
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
     setCopiedField(field);
-    toast.success('Copied!');
+    toast.success(t('copied'));
     setTimeout(() => setCopiedField(null), 2000);
   };
 
@@ -108,7 +110,7 @@ export function MessageViewer({
     
     const rawContent = message.raw || message.content?.raw;
     if (!rawContent) {
-      toast.error('Raw email not available');
+      toast.error(t('rawNotAvailable'));
       return;
     }
 
@@ -128,7 +130,7 @@ export function MessageViewer({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    toast.success('Email downloaded');
+    toast.success(t('emailDownloaded'));
   };
 
   const hasRawContent = message && (message.raw || message.content?.raw);
@@ -170,11 +172,11 @@ export function MessageViewer({
   if (!message && !loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-12 px-6">
-        <div className="w-20 h-20 rounded-2xl bg-pastel-lilac flex items-center justify-center mb-4">
+        <div className="w-20 h-20 rounded-2xl bg-pastel-lilac flex items-center justify-center mb-4 theme-transition">
           <span className="text-3xl">✉️</span>
         </div>
         <p className="text-muted-foreground text-center">
-          Select a message to view its content
+          {t('selectMessage')}
         </p>
       </div>
     );
@@ -217,48 +219,48 @@ export function MessageViewer({
 
     if (hasRaw) {
       return (
-        <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words">
+        <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words theme-transition">
           {rawContent}
         </pre>
       );
     }
 
     return (
-      <p className="text-muted-foreground italic">No content available</p>
+      <p className="text-muted-foreground italic">{t('noContent')}</p>
     );
   };
 
   return (
     <div className="flex flex-col h-full animate-fade-in">
       {/* Header */}
-      <div className="p-4 border-b border-border/50">
+      <div className="p-4 border-b border-border/50 theme-transition">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             {showBackButton && (
               <Button
                 variant="ghost"
                 onClick={onBack}
-                className="mb-3 -ml-2 rounded-lg text-muted-foreground hover:text-foreground h-8 px-2"
+                className="mb-3 -ml-2 rounded-lg text-muted-foreground hover:text-foreground h-8 px-2 theme-transition"
               >
                 <ArrowLeft className="w-4 h-4 mr-1.5" />
-                Back
+                {t('back')}
               </Button>
             )}
 
-            <h2 className="text-lg font-semibold text-foreground mb-2 truncate" title={message.subject || '(No subject)'}>
-              {message.subject || '(No subject)'}
+            <h2 className="text-lg font-semibold text-foreground mb-2 truncate" title={message.subject || t('noSubject')}>
+              {message.subject || t('noSubject')}
             </h2>
 
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-[13px]">
-                <span className="text-muted-foreground shrink-0">From:</span>
+                <span className="text-muted-foreground shrink-0">{t('from')}</span>
                 <span className="font-medium text-foreground truncate">{message.from}</span>
                 {message.from && (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => copyToClipboard(message.from, 'from')}
-                    className="h-5 w-5 rounded shrink-0"
+                    className="h-5 w-5 rounded shrink-0 theme-transition"
                   >
                     {copiedField === 'from' ? (
                       <Check className="w-3 h-3" />
@@ -270,7 +272,7 @@ export function MessageViewer({
               </div>
 
               <div className="flex items-center gap-2 text-[13px]">
-                <span className="text-muted-foreground shrink-0">To:</span>
+                <span className="text-muted-foreground shrink-0">{t('to')}</span>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -293,7 +295,7 @@ export function MessageViewer({
                       const recipient = Array.isArray(message.to) ? message.to[0] : message.to;
                       if (recipient) copyToClipboard(recipient, 'to');
                     }}
-                    className="h-5 w-5 rounded shrink-0"
+                    className="h-5 w-5 rounded shrink-0 theme-transition"
                   >
                     {copiedField === 'to' ? (
                       <Check className="w-3 h-3" />
@@ -321,13 +323,13 @@ export function MessageViewer({
                       variant="ghost"
                       size="icon"
                       onClick={() => onMarkAsUnread(message.id)}
-                      className="h-8 w-8 rounded-lg"
+                      className="h-8 w-8 rounded-lg theme-transition"
                     >
                       <MailOpen className="w-4 h-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Mark as unread</p>
+                    <p>{t('markAsUnread')}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -341,14 +343,14 @@ export function MessageViewer({
                     variant="ghost"
                     size="icon"
                     onClick={downloadRawEmail}
-                    className="h-8 w-8 rounded-lg"
+                    className="h-8 w-8 rounded-lg theme-transition"
                     disabled={!hasRawContent}
                   >
                     <Download className="w-4 h-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{hasRawContent ? 'Download raw email (.eml)' : 'Raw email not available'}</p>
+                  <p>{hasRawContent ? t('downloadRaw') : t('rawNotAvailable')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -360,7 +362,7 @@ export function MessageViewer({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 theme-transition"
                     disabled={deleting}
                   >
                     {deleting ? (
@@ -372,18 +374,18 @@ export function MessageViewer({
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                    <AlertDialogTitle>{t('deleteMessage')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone.
+                      {t('deleteDescription')}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
-                      Delete
+                      {t('delete')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -396,13 +398,13 @@ export function MessageViewer({
         {hasRaw && Object.keys(headers).length > 0 && (
           <Collapsible open={showHeaders} onOpenChange={setShowHeaders} className="mt-3">
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground">
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-muted-foreground theme-transition">
                 {showHeaders ? <ChevronUp className="w-3 h-3 mr-1" /> : <ChevronDown className="w-3 h-3 mr-1" />}
-                {showHeaders ? 'Hide' : 'Show'} headers
+                {showHeaders ? t('hideHeaders') : t('showHeaders')}
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2">
-              <div className="bg-secondary rounded-lg p-3 text-xs font-mono space-y-1 max-h-48 overflow-auto">
+              <div className="bg-secondary rounded-lg p-3 text-xs font-mono space-y-1 max-h-48 overflow-auto theme-transition">
                 {headers['Message-ID'] && (
                   <div><span className="text-muted-foreground">Message-ID:</span> {headers['Message-ID']}</div>
                 )}
