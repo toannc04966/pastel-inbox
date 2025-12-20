@@ -9,7 +9,6 @@ interface MessageListProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   loading: boolean;
-  hasInbox: boolean;
 }
 
 function SkeletonRow() {
@@ -27,7 +26,6 @@ export function MessageList({
   selectedId,
   onSelect,
   loading,
-  hasInbox,
 }: MessageListProps) {
   const [search, setSearch] = useState('');
 
@@ -38,30 +36,18 @@ export function MessageList({
       (m) =>
         m.from.toLowerCase().includes(query) ||
         m.subject.toLowerCase().includes(query) ||
-        m.preview.toLowerCase().includes(query)
+        (m.preview && m.preview.toLowerCase().includes(query))
     );
   }, [messages, search]);
 
-  const formatTime = (date: string) => {
+  const formatTime = (date: string | number) => {
     try {
-      return formatDistanceToNow(new Date(date), { addSuffix: true });
+      const d = typeof date === 'number' ? new Date(date) : new Date(date);
+      return formatDistanceToNow(d, { addSuffix: true });
     } catch {
-      return date;
+      return String(date);
     }
   };
-
-  if (!hasInbox) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-12 px-6">
-        <div className="w-20 h-20 rounded-2xl bg-pastel-blue flex items-center justify-center mb-4">
-          <Inbox className="w-10 h-10 text-muted-foreground" />
-        </div>
-        <p className="text-muted-foreground text-center">
-          Generate an address to start receiving emails
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col h-full">
@@ -89,7 +75,7 @@ export function MessageList({
         ) : filteredMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-6">
             <div className="w-16 h-16 rounded-2xl bg-pastel-cream flex items-center justify-center mb-4">
-              <span className="text-2xl">📭</span>
+              <Inbox className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground text-center">
               {search ? 'No messages match your search' : 'No emails yet. They will appear here automatically.'}
@@ -116,9 +102,11 @@ export function MessageList({
                 <p className="text-sm text-foreground truncate mb-1">
                   {message.subject || '(No subject)'}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {message.preview}
-                </p>
+                {message.preview && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {message.preview}
+                  </p>
+                )}
               </button>
             ))}
           </div>

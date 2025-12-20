@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TopBar } from '@/components/TopBar';
-import { AddressCard } from '@/components/AddressCard';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
 import { ErrorBanner } from '@/components/ErrorBanner';
@@ -15,20 +14,21 @@ const Inbox = () => {
   const isMobile = useIsMobile();
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
   
-  const [selectedDomain, setSelectedDomain] = useState('');
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
 
   const {
     domains,
-    inbox,
+    selectedDomain,
     messages,
     selectedMessage,
     loading,
     error,
     setError,
-    generateInbox,
+    handleDomainChange,
     fetchMessage,
     setSelectedMessage,
+    refreshMessages,
+    ALL_DOMAINS,
   } = useMailApi();
 
   // Redirect if not authenticated
@@ -37,19 +37,6 @@ const Inbox = () => {
       navigate('/login');
     }
   }, [authLoading, isAuthenticated, navigate]);
-
-  // Set default domain when domains load
-  useEffect(() => {
-    if (domains.length > 0 && !selectedDomain) {
-      setSelectedDomain(domains[0]);
-    }
-  }, [domains, selectedDomain]);
-
-  const handleGenerate = () => {
-    if (selectedDomain) {
-      generateInbox(selectedDomain, 10);
-    }
-  };
 
   const handleSelectMessage = (id: string) => {
     fetchMessage(id);
@@ -73,7 +60,6 @@ const Inbox = () => {
           </div>
         </div>
         <div className="flex-1 p-4 md:p-6">
-          <Skeleton className="h-32 w-full rounded-2xl mb-6" />
           <Skeleton className="h-96 w-full rounded-2xl" />
         </div>
       </div>
@@ -90,9 +76,10 @@ const Inbox = () => {
       <TopBar
         domains={domains}
         selectedDomain={selectedDomain}
-        onDomainChange={setSelectedDomain}
-        onGenerate={handleGenerate}
-        loading={loading.inbox || loading.domains}
+        allDomainsValue={ALL_DOMAINS}
+        onDomainChange={handleDomainChange}
+        onRefresh={refreshMessages}
+        loading={loading.messages || loading.domains}
         user={user}
         onLogout={logout}
       />
@@ -100,17 +87,8 @@ const Inbox = () => {
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
       <div className="flex-1 p-4 md:p-6 overflow-hidden">
-        {/* Address Card */}
-        <div className="mb-4 md:mb-6">
-          <AddressCard
-            inbox={inbox}
-            onRegenerate={handleGenerate}
-            loading={loading.inbox}
-          />
-        </div>
-
         {/* Main Content - Two Column Layout */}
-        <div className="pastel-card flex-1 overflow-hidden" style={{ height: 'calc(100vh - 280px)' }}>
+        <div className="pastel-card flex-1 overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
           {isMobile ? (
             // Mobile: Stacked Layout
             <div className="h-full">
@@ -120,7 +98,6 @@ const Inbox = () => {
                   selectedId={selectedMessage?.id || null}
                   onSelect={handleSelectMessage}
                   loading={loading.messages}
-                  hasInbox={!!inbox}
                 />
               ) : (
                 <MessageViewer
@@ -140,7 +117,6 @@ const Inbox = () => {
                   selectedId={selectedMessage?.id || null}
                   onSelect={handleSelectMessage}
                   loading={loading.messages}
-                  hasInbox={!!inbox}
                 />
               </div>
               <div className="flex-1 overflow-hidden">

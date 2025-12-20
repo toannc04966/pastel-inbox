@@ -1,7 +1,6 @@
 import { ArrowLeft, Copy, Check } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 import type { Message } from '@/types/mail';
@@ -35,7 +34,6 @@ export function MessageViewer({
   showBackButton,
 }: MessageViewerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
@@ -44,45 +42,14 @@ export function MessageViewer({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const formatTime = (date: string) => {
+  const formatTime = (date: string | number) => {
     try {
-      const d = new Date(date);
+      const d = typeof date === 'number' ? new Date(date) : new Date(date);
       return `${formatDistanceToNow(d, { addSuffix: true })} · ${format(d, 'MMM d, yyyy HH:mm')}`;
     } catch {
-      return date;
+      return String(date);
     }
   };
-
-  // Update iframe content when message changes
-  useEffect(() => {
-    if (message?.content.html && iframeRef.current) {
-      const doc = iframeRef.current.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body {
-                font-family: 'Inter', system-ui, sans-serif;
-                font-size: 14px;
-                line-height: 1.6;
-                color: #333;
-                padding: 16px;
-                margin: 0;
-              }
-              img { max-width: 100%; height: auto; }
-              a { color: #7c6cbb; }
-            </style>
-          </head>
-          <body>${message.content.html}</body>
-          </html>
-        `);
-        doc.close();
-      }
-    }
-  }, [message?.content.html]);
 
   if (!message && !loading) {
     return (
@@ -102,6 +69,9 @@ export function MessageViewer({
   }
 
   if (!message) return null;
+
+  // Get raw content from message
+  const rawContent = message.content?.raw || '';
 
   return (
     <div className="flex flex-col h-full animate-fade-in">
@@ -146,41 +116,11 @@ export function MessageViewer({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
-        <Tabs defaultValue="preview" className="h-full flex flex-col">
-          <div className="px-6 pt-4">
-            <TabsList className="rounded-xl bg-secondary p-1">
-              <TabsTrigger value="preview" className="rounded-lg">
-                Preview
-              </TabsTrigger>
-              <TabsTrigger value="raw" className="rounded-lg">
-                Raw
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="preview" className="flex-1 overflow-auto m-0 p-6">
-            {message.content.html ? (
-              <iframe
-                ref={iframeRef}
-                title="Email content"
-                className="w-full h-full min-h-[400px] rounded-xl border border-border/50 bg-card"
-                sandbox="allow-same-origin"
-              />
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                {message.content.text || 'No content available'}
-              </pre>
-            )}
-          </TabsContent>
-
-          <TabsContent value="raw" className="flex-1 overflow-auto m-0 p-6">
-            <pre className="text-xs text-muted-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto max-h-full">
-              {message.content.raw || JSON.stringify(message, null, 2)}
-            </pre>
-          </TabsContent>
-        </Tabs>
+      {/* Raw Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words">
+          {rawContent || 'No raw content available'}
+        </pre>
       </div>
     </div>
   );
