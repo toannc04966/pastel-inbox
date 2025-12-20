@@ -28,6 +28,7 @@ const Inbox = () => {
     fetchMessage,
     setSelectedMessage,
     refreshMessages,
+    deleteMessage,
     ALL_DOMAINS,
   } = useMailApi();
 
@@ -103,7 +104,9 @@ const Inbox = () => {
                 <MessageViewer
                   message={selectedMessage}
                   loading={loading.message}
+                  deleting={loading.deleting}
                   onBack={handleBackToList}
+                  onDelete={deleteMessage}
                   showBackButton
                 />
               )}
@@ -123,6 +126,8 @@ const Inbox = () => {
                 <MessageViewer
                   message={selectedMessage}
                   loading={loading.message}
+                  deleting={loading.deleting}
+                  onDelete={deleteMessage}
                 />
               </div>
             </div>

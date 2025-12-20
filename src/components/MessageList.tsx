@@ -13,10 +13,10 @@ interface MessageListProps {
 
 function SkeletonRow() {
   return (
-    <div className="p-4 space-y-2">
-      <div className="shimmer h-4 w-32 rounded" />
-      <div className="shimmer h-3 w-48 rounded" />
-      <div className="shimmer h-3 w-full rounded" />
+    <div className="px-3 py-2.5 space-y-1.5">
+      <div className="shimmer h-3.5 w-28 rounded" />
+      <div className="shimmer h-3 w-40 rounded" />
+      <div className="shimmer h-2.5 w-full rounded" />
     </div>
   );
 }
@@ -52,14 +52,14 @@ export function MessageList({
   return (
     <div className="flex flex-col h-full">
       {/* Search Input */}
-      <div className="p-4 border-b border-border/50">
+      <div className="px-3 py-2.5 border-b border-border/50">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             placeholder="Search messages..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10 rounded-xl bg-secondary border-0 h-10"
+            className="pl-9 rounded-lg bg-secondary border-0 h-8 text-sm"
           />
         </div>
       </div>
@@ -73,12 +73,12 @@ export function MessageList({
             <SkeletonRow />
           </div>
         ) : filteredMessages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-6">
-            <div className="w-16 h-16 rounded-2xl bg-pastel-cream flex items-center justify-center mb-4">
-              <Inbox className="w-8 h-8 text-muted-foreground" />
+          <div className="flex flex-col items-center justify-center py-10 px-4">
+            <div className="w-12 h-12 rounded-xl bg-pastel-cream flex items-center justify-center mb-3">
+              <Inbox className="w-6 h-6 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground text-center">
-              {search ? 'No messages match your search' : 'No emails yet. They will appear here automatically.'}
+            <p className="text-sm text-muted-foreground text-center">
+              {search ? 'No messages match your search' : 'Waiting for incoming emails…'}
             </p>
           </div>
         ) : (
@@ -87,23 +87,24 @@ export function MessageList({
               <button
                 key={message.id}
                 onClick={() => onSelect(message.id)}
-                className={`w-full text-left p-4 transition-all hover:bg-secondary/50 ${
+                className={`w-full text-left px-3 py-2 transition-all hover:bg-secondary/50 ${
                   selectedId === message.id ? 'message-selected' : ''
                 }`}
+                title={`From: ${message.from}\nSubject: ${message.subject || '(No subject)'}`}
               >
-                <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <span className="font-medium text-foreground truncate">
+                <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                  <span className="text-[13px] font-medium text-foreground truncate max-w-[180px]">
                     {message.from}
                   </span>
-                  <span className="text-xs text-muted-foreground shrink-0">
+                  <span className="text-[11px] text-muted-foreground shrink-0">
                     {formatTime(message.receivedAt)}
                   </span>
                 </div>
-                <p className="text-sm text-foreground truncate mb-1">
+                <p className="text-[13px] text-foreground truncate mb-0.5">
                   {message.subject || '(No subject)'}
                 </p>
                 {message.preview && (
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-[11px] text-muted-foreground truncate">
                     {message.preview}
                   </p>
                 )}

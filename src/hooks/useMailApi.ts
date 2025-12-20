@@ -1,19 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiFetch, ApiError } from '@/lib/api';
 import type { MessagePreview, Message, ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
 
 const ALL_DOMAINS = '__all__';
+const DOMAIN_PARAM = 'domain';
 
 export function useMailApi() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialDomain = searchParams.get(DOMAIN_PARAM) || ALL_DOMAINS;
+  
   const [domains, setDomains] = useState<string[]>([]);
-  const [selectedDomain, setSelectedDomain] = useState<string>(ALL_DOMAINS);
+  const [selectedDomain, setSelectedDomain] = useState<string>(initialDomain);
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState({
     domains: true,
     messages: false,
     message: false,
+    deleting: false,
   });
   const [error, setError] = useState<string | null>(null);
   
@@ -91,7 +97,60 @@ export function useMailApi() {
   const handleDomainChange = useCallback((domain: string) => {
     setSelectedDomain(domain);
     setSelectedMessage(null);
-  }, []);
+    // Persist domain in URL
+    const newParams = new URLSearchParams(searchParams);
+    if (domain === ALL_DOMAINS) {
+      newParams.delete(DOMAIN_PARAM);
+    } else {
+      newParams.set(DOMAIN_PARAM, domain);
+    }
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
+    setLoading(prev => ({ ...prev, deleting: true }));
+    
+    try {
+      const res = await apiFetch<ApiResponse<null>>(
+        `/api/v1/messages/${encodeURIComponent(messageId)}`,
+        { method: 'DELETE' }
+      );
+      
+      if (res.ok) {
+        // Find index of deleted message
+        const idx = messages.findIndex(m => m.id === messageId);
+        const newMessages = messages.filter(m => m.id !== messageId);
+        setMessages(newMessages);
+        
+        // Auto-select next message
+        if (newMessages.length > 0) {
+          const nextIdx = idx < newMessages.length ? idx : newMessages.length - 1;
+          const nextMessage = newMessages[nextIdx];
+          // Fetch the full message
+          const msgRes = await apiFetch<ApiResponse<{ message: Message }>>(
+            `/api/v1/messages/${encodeURIComponent(nextMessage.id)}`
+          );
+          if (msgRes.ok && msgRes.data) {
+            setSelectedMessage(msgRes.data.message);
+          }
+        } else {
+          setSelectedMessage(null);
+        }
+        
+        toast.success('Message deleted');
+        return true;
+      } else {
+        throw { message: 'Failed to delete message', status: 500 };
+      }
+    } catch (err) {
+      const apiErr = err as ApiError;
+      toast.error('Failed to delete message');
+      console.error('[Mail] Delete error:', apiErr);
+      return false;
+    } finally {
+      setLoading(prev => ({ ...prev, deleting: false }));
+    }
+  }, [messages]);
 
   const refreshMessages = useCallback(() => {
     fetchMessages();
@@ -133,6 +192,7 @@ export function useMailApi() {
     fetchMessage,
     setSelectedMessage,
     refreshMessages,
+    deleteMessage,
     ALL_DOMAINS,
   };
 }
