@@ -285,6 +285,23 @@ export function MessageViewer({
                     )}
                   </Tooltip>
                 </TooltipProvider>
+                {message.to && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      const recipient = Array.isArray(message.to) ? message.to[0] : message.to;
+                      if (recipient) copyToClipboard(recipient, 'to');
+                    }}
+                    className="h-5 w-5 rounded shrink-0"
+                  >
+                    {copiedField === 'to' ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </Button>
+                )}
               </div>
 
               <div className="text-[12px] text-muted-foreground">
