@@ -25,7 +25,10 @@ export interface Message {
   from: string;
   subject: string;
   receivedAt: string;
-  content: MessageContent;
+  content?: MessageContent;
+  html?: string;
+  text?: string;
+  raw?: string;
 }
 
 export interface ApiResponse<T> {
