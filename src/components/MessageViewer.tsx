@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen, Paperclip, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -429,6 +429,47 @@ export function MessageViewer({
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
         {renderContent()}
+
+        {/* Attachments Section */}
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-border/50 theme-transition">
+            <div className="flex items-center gap-2 mb-3">
+              <Paperclip className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">
+                {t('attachments')} ({message.attachments.length})
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {message.attachments.map((attachment) => {
+                const sizeKB = (attachment.size / 1024).toFixed(1);
+                const downloadUrl = `https://bpink-mail.ahn2k22.workers.dev/api/v1/messages/${message.id}/attachments/${attachment.id}`;
+                
+                return (
+                  <a
+                    key={attachment.id}
+                    href={downloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50 hover:bg-secondary border border-border/30 transition-colors theme-transition group"
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-primary shrink-0">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                        {attachment.filename}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {sizeKB} KB
+                      </p>
+                    </div>
+                    <Download className="w-4 h-4 text-muted-foreground group-hover:text-primary shrink-0 transition-colors" />
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

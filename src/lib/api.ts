@@ -1,4 +1,4 @@
-const API_BASE = 'https://temp-mail-worker.ahn2k22.workers.dev';
+const API_BASE = 'https://bpink-mail.ahn2k22.workers.dev';
 
 export interface ApiError {
   message: string;
