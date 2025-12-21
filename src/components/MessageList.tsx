@@ -1,6 +1,7 @@
 import { Search, Inbox } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { MessagePreview } from '@/types/mail';
@@ -30,6 +31,7 @@ interface MessageListProps {
   isRead?: (id: string) => boolean;
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
+  showDomainBadge?: boolean;
 }
 
 function SkeletonRow() {
@@ -50,6 +52,7 @@ export function MessageList({
   isRead,
   searchQuery: externalSearch,
   onSearchChange,
+  showDomainBadge = false,
 }: MessageListProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const { t } = useLanguage();
@@ -158,9 +161,16 @@ export function MessageList({
                       {message.preview}
                     </p>
                   )}
-                  {!messageIsRead && (
-                    <span className="inline-block w-2 h-2 rounded-full bg-primary mt-1 theme-transition" />
-                  )}
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {!messageIsRead && (
+                      <span className="inline-block w-2 h-2 rounded-full bg-primary theme-transition" />
+                    )}
+                    {showDomainBadge && message.domain && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
+                        @{message.domain}
+                      </Badge>
+                    )}
+                  </div>
                 </button>
               );
             })}

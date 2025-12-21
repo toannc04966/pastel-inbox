@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, KeyRound, Users, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Plus, KeyRound, Users, RefreshCw, Shield } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -24,6 +24,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { PermissionsModal } from '@/components/PermissionsModal';
 import { toast } from 'sonner';
 
 interface AdminUser {
@@ -48,6 +50,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
   // Create user form
@@ -138,6 +141,11 @@ const Admin = () => {
     setSelectedUser(adminUser);
     setResetPassword('');
     setResetPasswordDialogOpen(true);
+  };
+
+  const openPermissionsDialog = (adminUser: AdminUser) => {
+    setSelectedUser(adminUser);
+    setPermissionsDialogOpen(true);
   };
 
   if (authLoading) {
@@ -232,15 +240,34 @@ const Admin = () => {
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openResetPasswordDialog(adminUser)}
-                        className="rounded-lg"
-                      >
-                        <KeyRound className="w-4 h-4 mr-1" />
-                        {t('resetPassword')}
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openPermissionsDialog(adminUser)}
+                                className="rounded-lg h-8 w-8"
+                              >
+                                <Shield className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t('managePermissions')}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openResetPasswordDialog(adminUser)}
+                          className="rounded-lg"
+                        >
+                          <KeyRound className="w-4 h-4 mr-1" />
+                          {t('resetPassword')}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -333,6 +360,15 @@ const Admin = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Permissions Modal */}
+      <PermissionsModal
+        isOpen={permissionsDialogOpen}
+        onClose={() => setPermissionsDialogOpen(false)}
+        userId={selectedUser?.id || null}
+        userEmail={selectedUser?.email || null}
+        onSaved={fetchUsers}
+      />
     </div>
   );
 };

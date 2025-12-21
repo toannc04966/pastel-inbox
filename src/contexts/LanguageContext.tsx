@@ -114,6 +114,20 @@ const translations = {
     recentInboxes: 'Recent Inboxes',
     noRecentInboxes: 'No recent inboxes for this domain',
     noDomains: 'No domains accessible. Contact administrator.',
+    
+    // Permissions Modal
+    managePermissions: 'Manage Permissions',
+    noPermissions: 'No domain permissions yet',
+    clickAddPermission: 'Click "Add Permission" to grant access to a domain.',
+    addPermission: 'Add Permission',
+    permissionModes: 'Permission Modes',
+    allInboxesDesc: 'User can browse all emails in domain',
+    addressOnlyDesc: 'User must specify email to view',
+    domain: 'Domain',
+    mode: 'Mode',
+    permissionsUpdated: 'Permissions updated successfully',
+    permissionsUpdateFailed: 'Failed to update permissions',
+    discardChanges: 'Discard unsaved changes?',
   },
   vi: {
     // TopBar
@@ -226,6 +240,20 @@ const translations = {
     recentInboxes: 'Hộp thư gần đây',
     noRecentInboxes: 'Không có hộp thư gần đây cho domain này',
     noDomains: 'Không có domain. Liên hệ quản trị viên.',
+    
+    // Permissions Modal
+    managePermissions: 'Quản lý quyền',
+    noPermissions: 'Chưa có quyền truy cập domain',
+    clickAddPermission: 'Nhấn "Thêm quyền" để cấp quyền truy cập domain.',
+    addPermission: 'Thêm quyền',
+    permissionModes: 'Chế độ quyền',
+    allInboxesDesc: 'Có thể xem tất cả email trong domain',
+    addressOnlyDesc: 'Phải chỉ định email để xem',
+    domain: 'Domain',
+    mode: 'Chế độ',
+    permissionsUpdated: 'Cập nhật quyền thành công',
+    permissionsUpdateFailed: 'Cập nhật quyền thất bại',
+    discardChanges: 'Bỏ các thay đổi chưa lưu?',
   },
 } as const;
 

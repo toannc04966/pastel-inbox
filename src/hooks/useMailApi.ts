@@ -76,7 +76,7 @@ export function useMailApi() {
   const fetchDomains = useCallback(async () => {
     setLoading((prev) => ({ ...prev, domains: true }));
     try {
-      const res = await apiFetch<ApiResponse<{ domains: string[]; permissions: DomainPermission[] }>>(
+      const res = await apiFetch<ApiResponse<{ domains: string[]; permissions: DomainPermission[]; hasAllInboxesAccess?: boolean }>>(
         '/api/v1/domains'
       );
       if (res.ok && res.data) {
@@ -86,10 +86,13 @@ export function useMailApi() {
         setDomains(domainList);
         setPermissions(permissionList);
 
-        // Auto-select first domain if none selected or selected domain no longer available
+        // Auto-select "all" if available, otherwise first domain
         const storedDomain = getStoredDomain();
         if (!storedDomain || !domainList.includes(storedDomain)) {
-          if (domainList.length > 0) {
+          if (domainList.includes('all')) {
+            setSelectedDomain('all');
+            setStoredDomain('all');
+          } else if (domainList.length > 0) {
             setSelectedDomain(domainList[0]);
             setStoredDomain(domainList[0]);
           }
