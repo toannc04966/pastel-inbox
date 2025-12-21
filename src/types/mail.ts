@@ -42,6 +42,8 @@ export interface Message {
   is_html?: boolean;
   content_html?: string;
   content_text?: string;
+  htmlBody?: string;
+  bodyHtml?: string;
   attachments?: Attachment[];
 }
 
