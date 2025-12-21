@@ -1,22 +1,22 @@
 import { useState, useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '@/lib/api';
-import type { MessagePreview, Message, ApiResponse } from '@/types/mail';
+import type { MessagePreview, Message, ApiResponse, DomainPermission, PermissionMode } from '@/types/mail';
 import { toast } from 'sonner';
 
-const ALL_DOMAINS = '__all__';
 const DOMAIN_STORAGE_KEY = 'tempmail_selected_domain';
+const EMAIL_STORAGE_KEY = 'tempmail_selected_email';
 
 function getStoredDomain(): string {
   try {
-    return localStorage.getItem(DOMAIN_STORAGE_KEY) || ALL_DOMAINS;
+    return localStorage.getItem(DOMAIN_STORAGE_KEY) || '';
   } catch {
-    return ALL_DOMAINS;
+    return '';
   }
 }
 
 function setStoredDomain(domain: string): void {
   try {
-    if (domain === ALL_DOMAINS) {
+    if (!domain) {
       localStorage.removeItem(DOMAIN_STORAGE_KEY);
     } else {
       localStorage.setItem(DOMAIN_STORAGE_KEY, domain);
@@ -26,9 +26,31 @@ function setStoredDomain(domain: string): void {
   }
 }
 
+function getStoredEmail(): string {
+  try {
+    return localStorage.getItem(EMAIL_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function setStoredEmail(email: string): void {
+  try {
+    if (!email) {
+      localStorage.removeItem(EMAIL_STORAGE_KEY);
+    } else {
+      localStorage.setItem(EMAIL_STORAGE_KEY, email);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function useMailApi() {
   const [domains, setDomains] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<DomainPermission[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string>(getStoredDomain);
+  const [selectedEmail, setSelectedEmail] = useState<string>(getStoredEmail);
   const [messages, setMessages] = useState<MessagePreview[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [loading, setLoading] = useState({
@@ -42,19 +64,43 @@ export function useMailApi() {
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Get permission mode for a domain
+  const getPermissionMode = useCallback((domain: string): PermissionMode | null => {
+    const permission = permissions.find((p) => p.domain === domain);
+    return permission?.mode || null;
+  }, [permissions]);
+
+  // Get current permission mode
+  const currentPermissionMode = getPermissionMode(selectedDomain);
+
   const fetchDomains = useCallback(async () => {
-    setLoading(prev => ({ ...prev, domains: true }));
+    setLoading((prev) => ({ ...prev, domains: true }));
     try {
-      const res = await apiFetch<ApiResponse<{ domains: string[] }>>('/api/v1/domains');
+      const res = await apiFetch<ApiResponse<{ domains: string[]; permissions: DomainPermission[] }>>(
+        '/api/v1/domains'
+      );
       if (res.ok && res.data) {
-        setDomains(res.data.domains);
+        const domainList = res.data.domains || [];
+        const permissionList = res.data.permissions || [];
+        
+        setDomains(domainList);
+        setPermissions(permissionList);
+
+        // Auto-select first domain if none selected or selected domain no longer available
+        const storedDomain = getStoredDomain();
+        if (!storedDomain || !domainList.includes(storedDomain)) {
+          if (domainList.length > 0) {
+            setSelectedDomain(domainList[0]);
+            setStoredDomain(domainList[0]);
+          }
+        }
       }
     } catch (err) {
       const apiErr = err as ApiError;
       setError(`Failed to fetch domains: ${apiErr.message}`);
       toast.error('Failed to load domains');
     } finally {
-      setLoading(prev => ({ ...prev, domains: false }));
+      setLoading((prev) => ({ ...prev, domains: false }));
     }
   }, []);
 
@@ -65,31 +111,115 @@ export function useMailApi() {
     }
     abortControllerRef.current = new AbortController();
 
-    setLoading(prev => ({ ...prev, messages: true }));
+    // Don't fetch if no domain selected
+    if (!selectedDomain) {
+      setMessages([]);
+      return;
+    }
+
+    const mode = getPermissionMode(selectedDomain);
+    
+    // For ADDRESS_ONLY mode, require email to be set
+    if (mode === 'ADDRESS_ONLY' && !selectedEmail) {
+      setMessages([]);
+      return;
+    }
+
+    setLoading((prev) => ({ ...prev, messages: true }));
+    setError(null);
 
     try {
-      const url = selectedDomain === ALL_DOMAINS
-        ? '/api/v1/messages'
-        : `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
+      let url: string;
       
+      if (mode === 'ADDRESS_ONLY' && selectedEmail) {
+        url = `/api/v1/messages?email=${encodeURIComponent(selectedEmail)}`;
+      } else {
+        url = `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
+      }
+
       const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
         url,
         { signal: abortControllerRef.current.signal }
       );
 
       if (res.ok && res.data) {
-        setMessages(res.data.messages);
+        setMessages(res.data.messages || []);
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
+      
+      const apiErr = err as ApiError;
+      
+      // Handle specific error cases
+      if (apiErr.status === 403) {
+        setError('Access denied. You may not have permission for this resource.');
+        toast.error('Access denied');
+      } else if (apiErr.status === 401) {
+        // Will be handled by auth redirect
+        setError('Session expired. Please log in again.');
+      } else {
+        setError(apiErr.message || 'Failed to fetch messages');
+      }
+      
+      setMessages([]);
       console.error('[Mail] Fetch messages error:', err);
     } finally {
-      setLoading(prev => ({ ...prev, messages: false }));
+      setLoading((prev) => ({ ...prev, messages: false }));
     }
-  }, [selectedDomain]);
+  }, [selectedDomain, selectedEmail, getPermissionMode]);
+
+  const fetchMessagesByEmail = useCallback(async (email: string): Promise<number> => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setLoading((prev) => ({ ...prev, messages: true }));
+    setError(null);
+
+    try {
+      const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
+        `/api/v1/messages?email=${encodeURIComponent(email)}`,
+        { signal: abortControllerRef.current.signal }
+      );
+
+      if (res.ok && res.data) {
+        const msgs = res.data.messages || [];
+        setMessages(msgs);
+        setSelectedEmail(email);
+        setStoredEmail(email);
+        return msgs.length;
+      }
+      return 0;
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return 0;
+      
+      const apiErr = err as ApiError;
+      
+      if (apiErr.status === 403) {
+        setError('Access denied. You may not have permission for this email.');
+        toast.error('Access denied');
+      } else if (apiErr.status === 404) {
+        // 404 means no messages - not an error
+        setMessages([]);
+        setSelectedEmail(email);
+        setStoredEmail(email);
+        return 0;
+      } else {
+        setError(apiErr.message || 'Failed to fetch messages');
+        toast.error('Failed to load messages');
+      }
+      
+      console.error('[Mail] Fetch messages by email error:', err);
+      return 0;
+    } finally {
+      setLoading((prev) => ({ ...prev, messages: false }));
+    }
+  }, []);
 
   const fetchMessage = useCallback(async (messageId: string) => {
-    setLoading(prev => ({ ...prev, message: true }));
+    setLoading((prev) => ({ ...prev, message: true }));
 
     try {
       const res = await apiFetch<ApiResponse<{ message: Message }>>(
@@ -103,21 +233,39 @@ export function useMailApi() {
       }
     } catch (err) {
       const apiErr = err as ApiError;
-      setError(`Failed to fetch message: ${apiErr.message}`);
-      toast.error('Failed to load message');
+      
+      if (apiErr.status === 403) {
+        setError('Access denied. Cannot access this message.');
+        toast.error('Cannot access this message');
+      } else {
+        setError(`Failed to fetch message: ${apiErr.message}`);
+        toast.error('Failed to load message');
+      }
     } finally {
-      setLoading(prev => ({ ...prev, message: false }));
+      setLoading((prev) => ({ ...prev, message: false }));
     }
   }, []);
 
   const handleDomainChange = useCallback((domain: string) => {
     setSelectedDomain(domain);
     setSelectedMessage(null);
+    setMessages([]);
+    setError(null);
     setStoredDomain(domain);
+    
+    // Clear selected email when changing domain
+    setSelectedEmail('');
+    setStoredEmail('');
+  }, []);
+
+  const handleEmailChange = useCallback((email: string) => {
+    setSelectedEmail(email);
+    setStoredEmail(email);
+    setSelectedMessage(null);
   }, []);
 
   const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
-    setLoading(prev => ({ ...prev, deleting: true }));
+    setLoading((prev) => ({ ...prev, deleting: true }));
     
     try {
       const res = await apiFetch<ApiResponse<null>>(
@@ -127,8 +275,8 @@ export function useMailApi() {
       
       if (res.ok) {
         // Find index of deleted message
-        const idx = messages.findIndex(m => m.id === messageId);
-        const newMessages = messages.filter(m => m.id !== messageId);
+        const idx = messages.findIndex((m) => m.id === messageId);
+        const newMessages = messages.filter((m) => m.id !== messageId);
         setMessages(newMessages);
         
         // Auto-select next message
@@ -157,16 +305,16 @@ export function useMailApi() {
       console.error('[Mail] Delete error:', apiErr);
       return false;
     } finally {
-      setLoading(prev => ({ ...prev, deleting: false }));
+      setLoading((prev) => ({ ...prev, deleting: false }));
     }
   }, [messages]);
 
   const clearInbox = useCallback(async (): Promise<boolean> => {
-    setLoading(prev => ({ ...prev, clearingInbox: true }));
+    setLoading((prev) => ({ ...prev, clearingInbox: true }));
     
     try {
       // Delete all messages one by one (or use bulk endpoint if available)
-      const deletePromises = messages.map(m => 
+      const deletePromises = messages.map((m) =>
         apiFetch<ApiResponse<null>>(
           `/api/v1/messages/${encodeURIComponent(m.id)}`,
           { method: 'DELETE' }
@@ -174,7 +322,7 @@ export function useMailApi() {
       );
       
       const results = await Promise.allSettled(deletePromises);
-      const successCount = results.filter(r => r.status === 'fulfilled').length;
+      const successCount = results.filter((r) => r.status === 'fulfilled').length;
       
       if (successCount === messages.length) {
         setMessages([]);
@@ -195,7 +343,7 @@ export function useMailApi() {
       console.error('[Mail] Clear inbox error:', apiErr);
       return false;
     } finally {
-      setLoading(prev => ({ ...prev, clearingInbox: false }));
+      setLoading((prev) => ({ ...prev, clearingInbox: false }));
     }
   }, [messages, fetchMessages]);
 
@@ -204,36 +352,39 @@ export function useMailApi() {
     toast.success('Refreshed');
   }, [fetchMessages]);
 
-  // Get inbox email based on selected domain
+  // Get inbox email based on selected domain/email
   const getInboxEmail = useCallback((): string | undefined => {
-    if (domains.length === 0) return undefined;
-    
-    // If specific domain selected, use it
-    if (selectedDomain !== ALL_DOMAINS) {
-      return `inbox@${selectedDomain}`;
+    if (selectedEmail) {
+      return selectedEmail;
     }
     
-    // Otherwise use first domain
-    return domains[0] ? `inbox@${domains[0]}` : undefined;
-  }, [domains, selectedDomain]);
+    if (domains.length === 0 || !selectedDomain) return undefined;
+    
+    return `inbox@${selectedDomain}`;
+  }, [domains, selectedDomain, selectedEmail]);
 
   return {
     domains,
+    permissions,
     selectedDomain,
+    selectedEmail,
     messages,
     selectedMessage,
     loading,
     error,
+    currentPermissionMode,
     setError,
     handleDomainChange,
+    handleEmailChange,
     fetchMessage,
+    fetchMessages,
+    fetchMessagesByEmail,
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
     clearInbox,
     fetchDomains,
-    fetchMessages,
     getInboxEmail,
-    ALL_DOMAINS,
+    getPermissionMode,
   };
 }

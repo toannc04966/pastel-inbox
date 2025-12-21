@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
+import { useRecentEmails } from '@/hooks/useRecentEmails';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useReadState } from '@/hooks/useReadState';
 import { useSmartRefresh } from '@/hooks/useSmartRefresh';
@@ -9,6 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { TopBar } from '@/components/TopBar';
 import { MessageList } from '@/components/MessageList';
 import { MessageViewer } from '@/components/MessageViewer';
+import { AddressOnlyInput } from '@/components/AddressOnlyInput';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -23,14 +25,19 @@ const Inbox = () => {
 
   const {
     domains,
+    permissions,
     selectedDomain,
+    selectedEmail,
     messages,
     selectedMessage,
     loading,
     error,
+    currentPermissionMode,
     setError,
     handleDomainChange: originalHandleDomainChange,
+    handleEmailChange,
     fetchMessage,
+    fetchMessagesByEmail,
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
@@ -38,9 +45,10 @@ const Inbox = () => {
     fetchDomains,
     fetchMessages,
     getInboxEmail,
-    ALL_DOMAINS,
+    getPermissionMode,
   } = useMailApi();
 
+  const { addRecentEmail, getRecentEmails, removeRecentEmail } = useRecentEmails();
   const { isRead, markAsRead, markAsUnread, clearReadState } = useReadState();
   
   const { autoRefreshEnabled, toggleAutoRefresh, isPaused } = useSmartRefresh(
@@ -56,6 +64,17 @@ const Inbox = () => {
     if (isMobile) {
       setMobileView('list');
       setSelectedMessage(null);
+    }
+  };
+
+  // Handle email submission for ADDRESS_ONLY mode
+  const handleEmailSubmit = async (email: string) => {
+    const count = await fetchMessagesByEmail(email);
+    addRecentEmail(selectedDomain, email, count);
+    
+    // Stay on list view for mobile
+    if (isMobile) {
+      setMobileView('list');
     }
   };
 
@@ -88,10 +107,12 @@ const Inbox = () => {
     fetchDomains();
   }, [fetchDomains]);
 
-  // Fetch messages when domain changes
+  // Fetch messages when domain changes (only for ALL_INBOXES mode)
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    if (currentPermissionMode === 'ALL_INBOXES') {
+      fetchMessages();
+    }
+  }, [fetchMessages, currentPermissionMode, selectedDomain]);
 
   // Set initial domain accent
   useEffect(() => {
@@ -122,7 +143,6 @@ const Inbox = () => {
     markAsUnread(id);
   };
 
-
   // Show loading skeleton while checking auth
   if (authLoading) {
     return (
@@ -146,13 +166,48 @@ const Inbox = () => {
 
   const inboxEmail = getInboxEmail();
 
+  // Determine if we should show the address input (ADDRESS_ONLY without email selected)
+  const showAddressInput = currentPermissionMode === 'ADDRESS_ONLY' && !selectedEmail;
+  
+  // Get recent emails for current domain
+  const recentEmails = getRecentEmails(selectedDomain);
+
+  // Render the message list or address input based on mode
+  const renderListPanel = () => {
+    if (showAddressInput) {
+      return (
+        <AddressOnlyInput
+          domain={selectedDomain}
+          recentEmails={recentEmails}
+          onSubmit={handleEmailSubmit}
+          onRemoveRecent={(email) => removeRecentEmail(selectedDomain, email)}
+          loading={loading.messages}
+        />
+      );
+    }
+
+    return (
+      <MessageList
+        messages={messages}
+        selectedId={selectedMessage?.id || null}
+        onSelect={handleSelectMessage}
+        loading={loading.messages}
+        isRead={isRead}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar
         domains={domains}
+        permissions={permissions}
         selectedDomain={selectedDomain}
-        allDomainsValue={ALL_DOMAINS}
+        selectedEmail={selectedEmail}
         onDomainChange={handleDomainChange}
+        onEmailClear={() => handleEmailChange('')}
         onRefresh={handleRefresh}
         onClearInbox={handleClearInboxWithReset}
         loading={loading.messages || loading.domains}
@@ -164,6 +219,7 @@ const Inbox = () => {
         autoRefreshPaused={isPaused}
         onToggleAutoRefresh={toggleAutoRefresh}
         messageCount={messages.length}
+        getPermissionMode={getPermissionMode}
       />
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
@@ -175,15 +231,7 @@ const Inbox = () => {
             // Mobile: Single column, switch between list and detail
             <div className="h-full overflow-hidden">
               {mobileView === 'list' ? (
-                <MessageList
-                  messages={messages}
-                  selectedId={selectedMessage?.id || null}
-                  onSelect={handleSelectMessage}
-                  loading={loading.messages}
-                  isRead={isRead}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                />
+                renderListPanel()
               ) : (
                 <MessageViewer
                   message={selectedMessage}
@@ -200,15 +248,7 @@ const Inbox = () => {
             // Desktop: Two Column Layout
             <div className="flex h-full">
               <div className="w-[380px] border-r border-border/50 flex-shrink-0">
-                <MessageList
-                  messages={messages}
-                  selectedId={selectedMessage?.id || null}
-                  onSelect={handleSelectMessage}
-                  loading={loading.messages}
-                  isRead={isRead}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                />
+                {renderListPanel()}
               </div>
               <div className="flex-1 overflow-hidden">
                 <MessageViewer
