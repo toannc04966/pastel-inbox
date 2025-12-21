@@ -93,12 +93,12 @@ export function MessageList({
       {/* Search Input */}
       <div className="px-3 py-2.5 border-b border-border/50 theme-transition">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 md:w-3.5 h-4 md:h-3.5 text-muted-foreground" />
           <Input
             placeholder={t('searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 rounded-lg bg-secondary border-0 h-8 text-sm theme-transition"
+            className="pl-10 md:pl-9 rounded-lg bg-secondary border-0 h-10 md:h-8 text-base md:text-sm theme-transition"
           />
         </div>
       </div>
@@ -126,27 +126,27 @@ export function MessageList({
               const messageIsRead = isRead ? isRead(message.id) : true;
               
               return (
-                <button
+              <button
                   key={message.id}
                   onClick={() => onSelect(message.id)}
-                  className={`w-full text-left px-3 py-2 message-hover theme-transition ${
+                  className={`w-full text-left px-3 py-2.5 md:py-2 message-hover theme-transition ${
                     selectedId === message.id ? 'message-selected' : ''
                   }`}
                   title={`${t('from')} ${message.from}\n${message.subject || t('noSubject')}`}
                 >
                   <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <span className={`text-[13px] truncate max-w-[180px] ${
+                    <span className={`text-sm md:text-[13px] truncate max-w-[65%] md:max-w-[180px] ${
                       messageIsRead 
                         ? 'font-normal text-foreground' 
                         : 'font-semibold text-foreground'
                     }`}>
                       {getSenderLabel(message)}
                     </span>
-                    <span className="text-[11px] text-muted-foreground shrink-0">
+                    <span className="text-xs md:text-[11px] text-muted-foreground shrink-0">
                       {formatTime(message.receivedAt)}
                     </span>
                   </div>
-                  <p className={`text-[13px] truncate mb-0.5 ${
+                  <p className={`text-sm md:text-[13px] truncate mb-0.5 ${
                     messageIsRead 
                       ? 'font-normal text-muted-foreground' 
                       : 'font-semibold text-foreground'
@@ -154,7 +154,7 @@ export function MessageList({
                     {message.subject || t('noSubject')}
                   </p>
                   {message.preview && (
-                    <p className="text-[11px] text-muted-foreground truncate">
+                    <p className="text-xs md:text-[11px] text-muted-foreground truncate">
                       {message.preview}
                     </p>
                   )}
