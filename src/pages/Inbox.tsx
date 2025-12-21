@@ -169,6 +169,9 @@ const Inbox = () => {
   // Determine if we should show the address input (ADDRESS_ONLY without email selected)
   const showAddressInput = currentPermissionMode === 'ADDRESS_ONLY' && !selectedEmail;
   
+  // Show domain badge when viewing "all" domains
+  const showDomainBadge = selectedDomain === 'all';
+  
   // Get recent emails for current domain
   const recentEmails = getRecentEmails(selectedDomain);
 
@@ -195,6 +198,7 @@ const Inbox = () => {
         isRead={isRead}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        showDomainBadge={showDomainBadge}
       />
     );
   };
