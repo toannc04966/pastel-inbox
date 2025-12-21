@@ -103,6 +103,17 @@ const translations = {
     create: 'Create',
     creating: 'Creating...',
     resetting: 'Resetting...',
+    
+    // Address Only Mode
+    enterEmailAddress: 'Please enter an email address',
+    emailMustEndWith: 'Email must end with @{domain}',
+    invalidEmailFormat: 'Invalid email format',
+    enterEmailToView: 'Enter email address to view inbox:',
+    loading: 'Loading...',
+    openInbox: 'Open Inbox',
+    recentInboxes: 'Recent Inboxes',
+    noRecentInboxes: 'No recent inboxes for this domain',
+    noDomains: 'No domains accessible. Contact administrator.',
   },
   vi: {
     // TopBar
@@ -204,6 +215,17 @@ const translations = {
     create: 'Tạo',
     creating: 'Đang tạo...',
     resetting: 'Đang đặt lại...',
+    
+    // Address Only Mode
+    enterEmailAddress: 'Vui lòng nhập địa chỉ email',
+    emailMustEndWith: 'Email phải kết thúc bằng @{domain}',
+    invalidEmailFormat: 'Định dạng email không hợp lệ',
+    enterEmailToView: 'Nhập địa chỉ email để xem hộp thư:',
+    loading: 'Đang tải...',
+    openInbox: 'Mở hộp thư',
+    recentInboxes: 'Hộp thư gần đây',
+    noRecentInboxes: 'Không có hộp thư gần đây cho domain này',
+    noDomains: 'Không có domain. Liên hệ quản trị viên.',
   },
 } as const;
 

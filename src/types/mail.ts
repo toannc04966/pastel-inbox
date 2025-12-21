@@ -5,6 +5,13 @@ export interface Inbox {
   createdAt: string;
 }
 
+export type PermissionMode = 'ALL_INBOXES' | 'ADDRESS_ONLY';
+
+export interface DomainPermission {
+  domain: string;
+  mode: PermissionMode;
+}
+
 export interface MessagePreview {
   id: string;
   from: string;
@@ -13,6 +20,8 @@ export interface MessagePreview {
   subject: string;
   preview: string;
   receivedAt: string;
+  inboxId?: string;
+  domain?: string;
 }
 
 export interface MessageContent {
@@ -47,8 +56,18 @@ export interface Message {
   attachments?: Attachment[];
 }
 
+export interface RecentEmail {
+  email: string;
+  messageCount: number;
+  lastAccessed: number;
+}
+
+export interface RecentEmailsByDomain {
+  [domain: string]: RecentEmail[];
+}
+
 export interface ApiResponse<T> {
   ok: boolean;
   data?: T;
-  error?: { message: string };
+  error?: string | { message: string };
 }
