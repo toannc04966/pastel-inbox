@@ -120,15 +120,22 @@ export function PermissionsModal({
   };
 
   const addPermission = () => {
+    const newId = crypto.randomUUID();
     setPermissions([
       ...permissions,
       {
-        id: crypto.randomUUID(),
+        id: newId,
         domain: '',
         mode: 'ALL_INBOXES',
       },
     ]);
     setHasChanges(true);
+    
+    // Auto-focus new input after render
+    setTimeout(() => {
+      const input = document.querySelector(`input[data-permission-id="${newId}"]`) as HTMLInputElement;
+      input?.focus();
+    }, 50);
   };
 
   const removePermission = (id: string) => {
@@ -265,6 +272,7 @@ export function PermissionsModal({
                 <div key={perm.id} className="space-y-1">
                   <div className="grid grid-cols-[1fr_140px_40px] gap-2 items-center">
                     <Input
+                      data-permission-id={perm.id}
                       value={perm.domain}
                       onChange={(e) => updatePermission(perm.id, 'domain', e.target.value)}
                       placeholder="example.com"
@@ -275,18 +283,34 @@ export function PermissionsModal({
                       onValueChange={(value) => updatePermission(perm.id, 'mode', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue />
+                        <SelectValue>
+                          {perm.mode === 'ALL_INBOXES' ? (
+                            <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400">
+                              ALL
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                              ADDR
+                            </Badge>
+                          )}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ALL_INBOXES">
-                          <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400">
-                            ALL
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400 w-fit">
+                              ALL
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">Browse all emails in domain</span>
+                          </div>
                         </SelectItem>
                         <SelectItem value="ADDRESS_ONLY">
-                          <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                            ADDR
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400 w-fit">
+                              ADDR
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">Must specify email to view</span>
+                          </div>
                         </SelectItem>
                       </SelectContent>
                     </Select>
