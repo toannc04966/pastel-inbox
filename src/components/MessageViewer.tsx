@@ -199,26 +199,23 @@ export function MessageViewer({
 
   if (!message) return null;
 
-  // Check new API fields first, then fallback to legacy fields
-  const isHtmlEmail = message.is_html === true && !!message.content_html?.trim();
-  const contentHtml = message.content_html || '';
-  const contentText = message.content_text || '';
-  
-  // Legacy fallbacks
-  const legacyHtml = message.html || message.content?.html || '';
-  const legacyText = message.text || message.content?.text || '';
+  // Check all possible HTML fields (CID already replaced by backend)
+  // Priority: content_html > htmlBody > bodyHtml > html > content.html
+  const processedHtml = message.content_html || message.htmlBody || message.bodyHtml || message.html || message.content?.html || '';
+  const contentText = message.content_text || message.text || message.content?.text || '';
   const rawContent = message.raw || message.content?.raw || '';
+  
+  const hasProcessedHtml = processedHtml.trim().length > 0;
+  const hasContentText = contentText.trim().length > 0;
 
-  const hasLegacyHtml = legacyHtml.trim().length > 0;
-  const hasLegacyText = legacyText.trim().length > 0;
   const hasRaw = rawContent.trim().length > 0;
 
   const headers = hasRaw ? extractHeaders(rawContent) : {};
 
   const renderContent = () => {
-    // Priority 1: New API with is_html flag
-    if (isHtmlEmail) {
-      const sanitized = sanitizeHtml(contentHtml);
+    // Priority 1: Processed HTML (CID already replaced by backend)
+    if (hasProcessedHtml) {
+      const sanitized = sanitizeHtml(processedHtml);
       return (
         <div
           className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80 [&_img]:max-w-full [&_img]:h-auto"
@@ -227,8 +224,8 @@ export function MessageViewer({
       );
     }
 
-    // Priority 2: New API plain text
-    if (contentText.trim()) {
+    // Priority 2: Plain text content
+    if (hasContentText) {
       return (
         <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
           {contentText}
@@ -236,27 +233,7 @@ export function MessageViewer({
       );
     }
 
-    // Priority 3: Legacy HTML (sanitize it too)
-    if (hasLegacyHtml) {
-      const sanitized = sanitizeHtml(legacyHtml);
-      return (
-        <div
-          className="prose prose-sm max-w-none text-foreground [&_a]:text-primary [&_a]:underline [&_a:hover]:opacity-80 [&_img]:max-w-full [&_img]:h-auto"
-          dangerouslySetInnerHTML={{ __html: sanitized }}
-        />
-      );
-    }
-
-    // Priority 4: Legacy plain text
-    if (hasLegacyText) {
-      return (
-        <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-          {legacyText}
-        </div>
-      );
-    }
-
-    // Priority 5: Raw content (never rendered as HTML)
+    // Priority 3: Raw content (never rendered as HTML - contains cid: references)
     if (hasRaw) {
       return (
         <pre className="text-sm text-foreground font-mono bg-secondary p-4 rounded-xl overflow-auto whitespace-pre-wrap break-words theme-transition">
