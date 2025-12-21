@@ -8,6 +8,8 @@ export interface Inbox {
 export interface MessagePreview {
   id: string;
   from: string;
+  sender_name?: string;
+  sender_email?: string;
   subject: string;
   preview: string;
   receivedAt: string;
