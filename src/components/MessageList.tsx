@@ -5,31 +5,35 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { MessagePreview } from '@/types/mail';
 
-// Extract friendly sender name from various email formats
-const getSenderLabel = (sender: string): string => {
-  if (!sender || !sender.trim()) {
-    return 'Unknown sender';
+// Extract friendly sender name with priority: sender_name > parsed name > local-part
+const getSenderLabel = (message: { sender_name?: string; sender_email?: string; from: string }): string => {
+  // Priority 1: Use sender_name if available
+  if (message.sender_name && message.sender_name.trim()) {
+    return message.sender_name.trim();
   }
 
+  const sender = message.from || '';
   const trimmed = sender.trim();
 
-  // Format: "Display Name <email@domain>" or Display Name <email@domain>
+  // Priority 2: Extract display name from "Name <email>" format
   const angleMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
   if (angleMatch) {
     const name = angleMatch[1].trim().replace(/^["']|["']$/g, ''); // Remove quotes
     if (name) {
       return name;
     }
-    return angleMatch[2]; // Return email if name is empty
   }
 
-  // Plain email format: email@domain
+  // Priority 3: Fallback to local-part
+  if (message.sender_email && message.sender_email.includes('@')) {
+    return message.sender_email.split('@')[0] || message.sender_email;
+  }
+
   if (trimmed.includes('@')) {
-    const localPart = trimmed.split('@')[0];
-    return localPart || trimmed;
+    return trimmed.split('@')[0] || trimmed;
   }
 
-  return trimmed;
+  return trimmed || 'Unknown sender';
 };
 
 interface MessageListProps {
@@ -150,7 +154,7 @@ export function MessageList({
                         ? 'font-normal text-foreground' 
                         : 'font-semibold text-foreground'
                     }`}>
-                      {getSenderLabel(message.from)}
+                      {getSenderLabel(message)}
                     </span>
                     <span className="text-[11px] text-muted-foreground shrink-0">
                       {formatTime(message.receivedAt)}
