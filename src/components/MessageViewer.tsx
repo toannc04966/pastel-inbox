@@ -267,25 +267,86 @@ export function MessageViewer({
     <div className="flex flex-col h-full animate-fade-in">
       {/* Header */}
       <div className="p-4 border-b border-border/50 theme-transition">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            {showBackButton && (
+        {/* Mobile: Back button and actions in header row */}
+        {showBackButton && (
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="-ml-2 rounded-lg text-muted-foreground hover:text-foreground h-9 px-2 theme-transition"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1.5" />
+              {t('back')}
+            </Button>
+            
+            {/* Mobile action buttons */}
+            <div className="flex items-center gap-1">
+              {onMarkAsUnread && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onMarkAsUnread(message.id)}
+                  className="h-9 w-9 rounded-lg theme-transition"
+                >
+                  <MailOpen className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
-                onClick={onBack}
-                className="mb-3 -ml-2 rounded-lg text-muted-foreground hover:text-foreground h-8 px-2 theme-transition"
+                size="icon"
+                onClick={downloadRawEmail}
+                className="h-9 w-9 rounded-lg theme-transition"
+                disabled={!hasRawContent}
               >
-                <ArrowLeft className="w-4 h-4 mr-1.5" />
-                {t('back')}
+                <Download className="w-4 h-4" />
               </Button>
-            )}
+              {onDelete && (
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 theme-transition"
+                      disabled={deleting}
+                    >
+                      {deleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('deleteMessage')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('deleteDescription')}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {t('delete')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          </div>
+        )}
 
-            <h2 className="text-lg font-semibold text-foreground mb-2 truncate" title={message.subject || t('noSubject')}>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base md:text-lg font-semibold text-foreground mb-2 break-words" title={message.subject || t('noSubject')}>
               {message.subject || t('noSubject')}
             </h2>
 
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-[13px]">
+              <div className="flex items-center gap-2 text-sm md:text-[13px]">
                 <span className="text-muted-foreground shrink-0">{t('from')}</span>
                 <span className="font-medium text-foreground truncate">{message.from}</span>
                 {message.from && (
@@ -293,7 +354,7 @@ export function MessageViewer({
                     variant="ghost"
                     size="icon"
                     onClick={() => copyToClipboard(message.from, 'from')}
-                    className="h-5 w-5 rounded shrink-0 theme-transition"
+                    className="h-6 w-6 md:h-5 md:w-5 rounded shrink-0 theme-transition"
                   >
                     {copiedField === 'from' ? (
                       <Check className="w-3 h-3" />
@@ -304,7 +365,7 @@ export function MessageViewer({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 text-[13px]">
+              <div className="flex items-center gap-2 text-sm md:text-[13px]">
                 <span className="text-muted-foreground shrink-0">{t('to')}</span>
                 <TooltipProvider>
                   <Tooltip>
@@ -328,7 +389,7 @@ export function MessageViewer({
                       const recipient = Array.isArray(message.to) ? message.to[0] : message.to;
                       if (recipient) copyToClipboard(recipient, 'to');
                     }}
-                    className="h-5 w-5 rounded shrink-0 theme-transition"
+                    className="h-6 w-6 md:h-5 md:w-5 rounded shrink-0 theme-transition"
                   >
                     {copiedField === 'to' ? (
                       <Check className="w-3 h-3" />
@@ -339,92 +400,91 @@ export function MessageViewer({
                 )}
               </div>
 
-              <div className="text-[12px] text-muted-foreground">
+              <div className="text-xs md:text-[12px] text-muted-foreground">
                 {formatTime(message.receivedAt)}
               </div>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Mark as Unread */}
-            {onMarkAsUnread && (
+          {/* Desktop Action Buttons - hidden on mobile when showBackButton is true */}
+          {!showBackButton && (
+            <div className="flex items-center gap-1 shrink-0">
+              {onMarkAsUnread && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onMarkAsUnread(message.id)}
+                        className="h-8 w-8 rounded-lg theme-transition"
+                      >
+                        <MailOpen className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{t('markAsUnread')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => onMarkAsUnread(message.id)}
+                      onClick={downloadRawEmail}
                       className="h-8 w-8 rounded-lg theme-transition"
+                      disabled={!hasRawContent}
                     >
-                      <MailOpen className="w-4 h-4" />
+                      <Download className="w-4 h-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{t('markAsUnread')}</p>
+                    <p>{hasRawContent ? t('downloadRaw') : t('rawNotAvailable')}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            )}
 
-            {/* Download Raw Email */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={downloadRawEmail}
-                    className="h-8 w-8 rounded-lg theme-transition"
-                    disabled={!hasRawContent}
-                  >
-                    <Download className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{hasRawContent ? t('downloadRaw') : t('rawNotAvailable')}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            {/* Delete */}
-            {onDelete && (
-              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 theme-transition"
-                    disabled={deleting}
-                  >
-                    {deleting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('deleteMessage')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('deleteDescription')}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              {onDelete && (
+                <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 theme-transition"
+                      disabled={deleting}
                     >
-                      {t('delete')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-          </div>
+                      {deleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('deleteMessage')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('deleteDescription')}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {t('delete')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Email Headers (Collapsible) */}

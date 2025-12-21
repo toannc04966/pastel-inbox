@@ -48,10 +48,39 @@ const Inbox = () => {
     30000
   );
 
-  // Wrap domain change to update accent color
+  // Wrap domain change to update accent color and reset mobile view
   const handleDomainChange = (domain: string) => {
     originalHandleDomainChange(domain);
     setDomainAccent(domain);
+    // Reset to list view on mobile when changing domain
+    if (isMobile) {
+      setMobileView('list');
+      setSelectedMessage(null);
+    }
+  };
+
+  // Wrap refresh to reset mobile view
+  const handleRefresh = () => {
+    refreshMessages();
+    // Reset to list view on mobile when refreshing
+    if (isMobile) {
+      setMobileView('list');
+      setSelectedMessage(null);
+    }
+  };
+
+  // Wrap clear inbox to reset mobile view
+  const handleClearInboxWithReset = async (): Promise<boolean> => {
+    const success = await clearInbox();
+    if (success) {
+      clearReadState();
+      // Reset to list view on mobile when clearing inbox
+      if (isMobile) {
+        setMobileView('list');
+        setSelectedMessage(null);
+      }
+    }
+    return success;
   };
 
   // Fetch domains on mount
@@ -93,13 +122,6 @@ const Inbox = () => {
     markAsUnread(id);
   };
 
-  const handleClearInbox = async (): Promise<boolean> => {
-    const success = await clearInbox();
-    if (success) {
-      clearReadState();
-    }
-    return success;
-  };
 
   // Show loading skeleton while checking auth
   if (authLoading) {
@@ -131,8 +153,8 @@ const Inbox = () => {
         selectedDomain={selectedDomain}
         allDomainsValue={ALL_DOMAINS}
         onDomainChange={handleDomainChange}
-        onRefresh={refreshMessages}
-        onClearInbox={handleClearInbox}
+        onRefresh={handleRefresh}
+        onClearInbox={handleClearInboxWithReset}
         loading={loading.messages || loading.domains}
         clearingInbox={loading.clearingInbox}
         user={user}
@@ -146,12 +168,12 @@ const Inbox = () => {
 
       {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
 
-      <div className="flex-1 p-4 md:p-6 overflow-hidden">
-        {/* Main Content - Two Column Layout */}
-        <div className="pastel-card flex-1 overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+      <div className="flex-1 p-2 md:p-6 overflow-hidden">
+        {/* Main Content - Responsive Layout */}
+        <div className="pastel-card flex-1 overflow-hidden h-[calc(100vh-88px)] md:h-[calc(100vh-140px)]">
           {isMobile ? (
-            // Mobile: Stacked Layout
-            <div className="h-full">
+            // Mobile: Single column, switch between list and detail
+            <div className="h-full overflow-hidden">
               {mobileView === 'list' ? (
                 <MessageList
                   messages={messages}
