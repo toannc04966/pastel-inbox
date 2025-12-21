@@ -5,35 +5,47 @@ import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { MessagePreview } from '@/types/mail';
 
-// Extract friendly sender name with priority: sender_name > parsed name > local-part
+// Extract friendly sender name with priority: sender_name (if not email-like) > parsed name from "from" > sender_name > local-part
 const getSenderLabel = (message: { sender_name?: string; sender_email?: string; from: string }): string => {
-  // Priority 1: Use sender_name if available
+  const fromField = message.from || '';
+  const trimmedFrom = fromField.trim();
+
+  // Try to extract display name from "Name <email>" format first
+  const angleMatch = trimmedFrom.match(/^(.+?)\s*<([^>]+)>$/);
+  const parsedName = angleMatch ? angleMatch[1].trim().replace(/^["']|["']$/g, '') : '';
+
+  // Priority 1: Use sender_name if it's a real name (not an email/local-part)
+  if (message.sender_name && message.sender_name.trim()) {
+    const senderName = message.sender_name.trim();
+    // Check if sender_name looks like a real name (not email-like)
+    // A real name typically doesn't contain @ or look like a bounce address
+    const looksLikeEmail = senderName.includes('@') || senderName.includes('=') || senderName.startsWith('bounces+');
+    if (!looksLikeEmail) {
+      return senderName;
+    }
+  }
+
+  // Priority 2: Use parsed display name from "from" field if available
+  if (parsedName) {
+    return parsedName;
+  }
+
+  // Priority 3: Fallback to sender_name even if it looks like email
   if (message.sender_name && message.sender_name.trim()) {
     return message.sender_name.trim();
   }
 
-  const sender = message.from || '';
-  const trimmed = sender.trim();
-
-  // Priority 2: Extract display name from "Name <email>" format
-  const angleMatch = trimmed.match(/^(.+?)\s*<([^>]+)>$/);
-  if (angleMatch) {
-    const name = angleMatch[1].trim().replace(/^["']|["']$/g, ''); // Remove quotes
-    if (name) {
-      return name;
-    }
-  }
-
-  // Priority 3: Fallback to local-part
+  // Priority 4: Fallback to sender_email local-part
   if (message.sender_email && message.sender_email.includes('@')) {
     return message.sender_email.split('@')[0] || message.sender_email;
   }
 
-  if (trimmed.includes('@')) {
-    return trimmed.split('@')[0] || trimmed;
+  // Priority 5: Fallback to from field local-part
+  if (trimmedFrom.includes('@')) {
+    return trimmedFrom.split('@')[0] || trimmedFrom;
   }
 
-  return trimmed || 'Unknown sender';
+  return trimmedFrom || 'Unknown sender';
 };
 
 interface MessageListProps {
