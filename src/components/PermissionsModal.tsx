@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Shield, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Shield, AlertCircle, Check, ChevronsUpDown } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -21,8 +20,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import type { PermissionMode } from '@/types/mail';
 
 interface PermissionRow {
@@ -50,6 +63,14 @@ interface PermissionsResponse {
   error?: string;
 }
 
+interface DomainsResponse {
+  ok: boolean;
+  data?: {
+    domains: string[];
+  };
+  error?: string;
+}
+
 const validateDomain = (domain: string): string | null => {
   if (!domain || !domain.trim()) {
     return 'Domain is required';
@@ -73,6 +94,95 @@ const validateDomain = (domain: string): string | null => {
   return null;
 };
 
+function DomainCombobox({
+  value,
+  onChange,
+  availableDomains,
+  error,
+  permId,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  availableDomains: string[];
+  error?: string;
+  permId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  const filteredDomains = availableDomains.filter((domain) =>
+    domain.toLowerCase().includes(inputValue.toLowerCase())
+  );
+
+  const handleSelect = (domain: string) => {
+    onChange(domain);
+    setInputValue(domain);
+    setOpen(false);
+  };
+
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+    onChange(newValue);
+    if (!open) setOpen(true);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div className="relative w-full">
+          <Input
+            ref={inputRef}
+            data-permission-id={permId}
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => setOpen(true)}
+            placeholder="Select or type domain"
+            className={cn(
+              'pr-8',
+              error ? 'border-destructive' : ''
+            )}
+          />
+          <ChevronsUpDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50 pointer-events-none" />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandList>
+            {filteredDomains.length === 0 ? (
+              <CommandEmpty>
+                {inputValue ? 'Press Enter to use custom domain' : 'No domains available'}
+              </CommandEmpty>
+            ) : (
+              <CommandGroup>
+                {filteredDomains.map((domain) => (
+                  <CommandItem
+                    key={domain}
+                    value={domain}
+                    onSelect={() => handleSelect(domain)}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4',
+                        value === domain ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {domain}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function PermissionsModal({
   isOpen,
   onClose,
@@ -82,6 +192,7 @@ export function PermissionsModal({
 }: PermissionsModalProps) {
   const { t } = useLanguage();
   const [permissions, setPermissions] = useState<PermissionRow[]>([]);
+  const [availableDomains, setAvailableDomains] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -89,8 +200,25 @@ export function PermissionsModal({
   useEffect(() => {
     if (isOpen && userId) {
       fetchPermissions();
+      fetchDomains();
     }
   }, [isOpen, userId]);
+
+  const fetchDomains = async () => {
+    try {
+      const res = await apiFetch<DomainsResponse>(
+        '/api/v1/domains',
+        { credentials: 'include' }
+      );
+      
+      if (res.ok && res.data) {
+        // Filter out "all" from available domains
+        setAvailableDomains(res.data.domains.filter((d) => d !== 'all'));
+      }
+    } catch (err) {
+      console.error('Failed to fetch domains:', err);
+    }
+  };
 
   const fetchPermissions = async () => {
     if (!userId) return;
@@ -237,7 +365,7 @@ export function PermissionsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[550px] max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
@@ -261,7 +389,7 @@ export function PermissionsModal({
           ) : (
             <div className="space-y-3">
               {/* Header */}
-              <div className="grid grid-cols-[1fr_140px_40px] gap-2 px-1 text-xs font-medium text-muted-foreground">
+              <div className="grid grid-cols-[1fr_180px_40px] gap-2 px-1 text-xs font-medium text-muted-foreground">
                 <span>{t('domain')}</span>
                 <span>{t('mode')}</span>
                 <span></span>
@@ -270,13 +398,13 @@ export function PermissionsModal({
               {/* Permission rows */}
               {permissions.map((perm) => (
                 <div key={perm.id} className="space-y-1">
-                  <div className="grid grid-cols-[1fr_140px_40px] gap-2 items-center">
-                    <Input
-                      data-permission-id={perm.id}
+                  <div className="grid grid-cols-[1fr_180px_40px] gap-2 items-center">
+                    <DomainCombobox
                       value={perm.domain}
-                      onChange={(e) => updatePermission(perm.id, 'domain', e.target.value)}
-                      placeholder="example.com"
-                      className={perm.error ? 'border-destructive' : ''}
+                      onChange={(value) => updatePermission(perm.id, 'domain', value)}
+                      availableDomains={availableDomains}
+                      error={perm.error}
+                      permId={perm.id}
                     />
                     <Select
                       value={perm.mode}
@@ -285,30 +413,34 @@ export function PermissionsModal({
                       <SelectTrigger>
                         <SelectValue>
                           {perm.mode === 'ALL_INBOXES' ? (
-                            <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400">
-                              ALL
-                            </Badge>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-green-500" />
+                              <span className="text-sm">All Inboxes</span>
+                            </span>
                           ) : (
-                            <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                              ADDR
-                            </Badge>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              <span className="text-sm">Address Only</span>
+                            </span>
                           )}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ALL_INBOXES">
-                          <div className="flex flex-col gap-1">
-                            <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400 w-fit">
-                              ALL
-                            </Badge>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-green-500" />
+                              All Inboxes
+                            </span>
                             <span className="text-xs text-muted-foreground">Browse all emails in domain</span>
                           </div>
                         </SelectItem>
                         <SelectItem value="ADDRESS_ONLY">
-                          <div className="flex flex-col gap-1">
-                            <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400 w-fit">
-                              ADDR
-                            </Badge>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              Address Only
+                            </span>
                             <span className="text-xs text-muted-foreground">Must specify email to view</span>
                           </div>
                         </SelectItem>
@@ -338,17 +470,13 @@ export function PermissionsModal({
           <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
             <p className="font-medium mb-1">{t('permissionModes')}:</p>
             <ul className="space-y-1">
-              <li>
-                <Badge variant="secondary" className="bg-green-500/20 text-green-600 dark:text-green-400 text-[10px] mr-1">
-                  ALL
-                </Badge>
-                {t('allInboxesDesc')}
+              <li className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="font-medium">All Inboxes</span> — {t('allInboxesDesc')}
               </li>
-              <li>
-                <Badge variant="secondary" className="bg-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] mr-1">
-                  ADDR
-                </Badge>
-                {t('addressOnlyDesc')}
+              <li className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="font-medium">Address Only</span> — {t('addressOnlyDesc')}
               </li>
             </ul>
           </div>
