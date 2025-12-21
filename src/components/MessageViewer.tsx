@@ -29,9 +29,25 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Message } from '@/types/mail';
 
+// Backend API base URL
+const API_BASE_URL = 'https://bpink-mail.ahn2k22.workers.dev';
+
+// Process HTML to replace relative attachment URLs with absolute backend URLs
+const processAttachmentUrls = (html: string): string => {
+  if (!html) return '';
+  
+  // Replace relative /api/ paths with absolute backend URLs
+  return html
+    .replace(/src="\/api\//g, `src="${API_BASE_URL}/api/`)
+    .replace(/href="\/api\//g, `href="${API_BASE_URL}/api/`);
+};
+
 // Helper to sanitize HTML content while preserving images
 const sanitizeHtml = (html: string): string => {
-  return DOMPurify.sanitize(html, {
+  // First process URLs, then sanitize
+  const processedHtml = processAttachmentUrls(html);
+  
+  return DOMPurify.sanitize(processedHtml, {
     USE_PROFILES: { html: true },
     ADD_TAGS: ['img'],
     ADD_ATTR: ['src', 'alt', 'width', 'height', 'style'],
