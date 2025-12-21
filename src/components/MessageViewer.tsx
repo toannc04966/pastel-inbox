@@ -29,9 +29,14 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { Message } from '@/types/mail';
 
-// Helper to sanitize HTML content
+// Helper to sanitize HTML content while preserving images
 const sanitizeHtml = (html: string): string => {
-  return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ADD_TAGS: ['img'],
+    ADD_ATTR: ['src', 'alt', 'width', 'height', 'style'],
+    ALLOW_DATA_ATTR: true,
+  });
 };
 
 interface MessageViewerProps {
