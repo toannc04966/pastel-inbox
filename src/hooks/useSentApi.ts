@@ -161,7 +161,7 @@ export function useSentApi() {
     }
   }, []);
 
-  const sendEmail = useCallback(async (payload: SendEmailPayload): Promise<SendEmailResponse | null> => {
+  const sendEmail = useCallback(async (payload: SendEmailPayload, attachments?: File[]): Promise<SendEmailResponse | null> => {
     // Check rate limit
     const currentLimit = getStoredRateLimit();
     if (currentLimit.remaining <= 0 && currentLimit.resetAt && Date.now() < currentLimit.resetAt) {
@@ -174,13 +174,40 @@ export function useSentApi() {
     setError(null);
 
     try {
-      const res = await apiFetch<ApiResponse<SendEmailResponse>>(
-        '/api/v1/send',
-        {
+      let res: ApiResponse<SendEmailResponse>;
+
+      if (attachments && attachments.length > 0) {
+        // Send with attachments using FormData
+        const formData = new FormData();
+        formData.append('json', JSON.stringify(payload));
+        
+        attachments.forEach((file, index) => {
+          formData.append(`attachment_${index}`, file);
+        });
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/v1/send`, {
           method: 'POST',
-          body: JSON.stringify(payload),
+          credentials: 'include',
+          body: formData,
+          // Don't set Content-Type header - browser will set it with boundary
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw { message: errorData.message || 'Failed to send email', status: response.status, error: errorData.error };
         }
-      );
+
+        res = await response.json();
+      } else {
+        // Send without attachments (standard JSON)
+        res = await apiFetch<ApiResponse<SendEmailResponse>>(
+          '/api/v1/send',
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }
+        );
+      }
 
       if (res.ok && res.data) {
         updateRateLimit(true);

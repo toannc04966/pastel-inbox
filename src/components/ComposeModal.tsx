@@ -43,7 +43,9 @@ import { useSentApi, ERROR_MESSAGES } from '@/hooks/useSentApi';
 import { useAuth } from '@/hooks/useAuth';
 import { API_BASE } from '@/lib/api';
 import DOMPurify from 'dompurify';
-import { ChevronDown, ChevronUp, Loader2, Send, Clock, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Send, Clock, AlertCircle, Paperclip, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { ComposeDraft, SendEmailPayload } from '@/types/sent';
 import type { Message } from '@/types/mail';
@@ -58,6 +60,7 @@ interface SendConfig {
 
 const MAX_SUBJECT_LENGTH = 200;
 const DRAFT_STORAGE_KEY = 'bpink_compose_draft';
+const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024; // 5MB
 
 interface ComposeModalProps {
   open: boolean;
@@ -149,6 +152,14 @@ export function ComposeModal({
   const [editorTab, setEditorTab] = useState<'visual' | 'html' | 'preview'>('visual');
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [totalAttachmentSize, setTotalAttachmentSize] = useState(0);
+
+  // Calculate total attachment size when attachments change
+  useEffect(() => {
+    const total = attachments.reduce((sum, file) => sum + file.size, 0);
+    setTotalAttachmentSize(total);
+  }, [attachments]);
 
   // Computed full from address
   const from = fromUsername && selectedDomain ? `${fromUsername}@${selectedDomain}` : '';
@@ -314,6 +325,26 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     setTextContent('');
     setShowCcBcc(false);
     setDraftRestored(false);
+    setAttachments([]);
+  };
+
+  const handleAddAttachments = (files: FileList | null) => {
+    if (!files) return;
+    
+    const fileArray = Array.from(files);
+    const newFiles = [...attachments, ...fileArray];
+    const newTotal = newFiles.reduce((sum, f) => sum + f.size, 0);
+    
+    if (newTotal > MAX_ATTACHMENT_SIZE) {
+      toast.error('Total attachment size exceeds 5MB');
+      return;
+    }
+    
+    setAttachments(newFiles);
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments(attachments.filter((_, i) => i !== index));
   };
 
   const handleSend = async () => {
@@ -331,7 +362,7 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     if (bcc.length > 0) payload.bcc = bcc;
     if (replyToEmail) payload.reply_to = replyToEmail;
 
-    const result = await sendEmail(payload);
+    const result = await sendEmail(payload, attachments.length > 0 ? attachments : undefined);
     if (result) {
       clearDraft(user?.id);
       resetForm();
@@ -637,6 +668,64 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
               </div>
             </TabsContent>
           </Tabs>
+        </div>
+
+        {/* Attachments Section */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Attachments (max 5MB total)</Label>
+          
+          {/* File input */}
+          <div className="flex items-center gap-3">
+            <label className="cursor-pointer">
+              <Input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  handleAddAttachments(e.target.files);
+                  e.target.value = ''; // Reset input
+                }}
+                className="hidden"
+              />
+              <div className="flex items-center gap-2 px-3 py-2 border border-input rounded-md bg-background hover:bg-accent text-sm transition-colors">
+                <Paperclip className="w-4 h-4" />
+                <span>Add files</span>
+              </div>
+            </label>
+            
+            <span className={cn(
+              'text-xs',
+              totalAttachmentSize > MAX_ATTACHMENT_SIZE * 0.8 ? 'text-warning-foreground' : 'text-muted-foreground',
+              totalAttachmentSize > MAX_ATTACHMENT_SIZE && 'text-destructive'
+            )}>
+              {(totalAttachmentSize / 1024 / 1024).toFixed(2)} MB / 5 MB
+            </span>
+          </div>
+          
+          {/* Attachment list */}
+          {attachments.length > 0 && (
+            <div className="space-y-1">
+              {attachments.map((file, index) => (
+                <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                  <div className="flex items-center gap-2 text-sm min-w-0">
+                    <Paperclip className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <span className="font-medium truncate">{file.name}</span>
+                    <span className="text-muted-foreground flex-shrink-0">
+                      ({(file.size / 1024).toFixed(1)} KB)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveAttachment(index)}
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
