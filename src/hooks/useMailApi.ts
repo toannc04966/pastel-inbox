@@ -58,6 +58,7 @@ export function useMailApi() {
     messages: false,
     message: false,
     deleting: false,
+    bulkDeleting: false,
     clearingInbox: false,
   });
   const [error, setError] = useState<string | null>(null);
@@ -350,6 +351,50 @@ export function useMailApi() {
     }
   }, [messages, fetchMessages]);
 
+  const bulkDeleteMessages = useCallback(async (messageIds: string[]): Promise<{ total: number; failed: number }> => {
+    setLoading((prev) => ({ ...prev, bulkDeleting: true }));
+    
+    try {
+      const results = await Promise.allSettled(
+        messageIds.map((id) =>
+          apiFetch<ApiResponse<null>>(
+            `/api/v1/messages/${encodeURIComponent(id)}`,
+            { method: 'DELETE' }
+          )
+        )
+      );
+      
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      const successCount = messageIds.length - failed;
+      
+      // Update local state
+      const deletedIds = new Set(messageIds);
+      setMessages((prev) => prev.filter((m) => !deletedIds.has(m.id)));
+      
+      // Clear selected message if it was deleted
+      if (selectedMessage && deletedIds.has(selectedMessage.id)) {
+        setSelectedMessage(null);
+      }
+      
+      if (failed === 0) {
+        toast.success(`${successCount} email${successCount > 1 ? 's' : ''} deleted successfully`);
+      } else if (successCount > 0) {
+        toast.warning(`${successCount}/${messageIds.length} emails deleted. ${failed} failed.`);
+      } else {
+        toast.error('Failed to delete emails');
+      }
+      
+      return { total: messageIds.length, failed };
+    } catch (err) {
+      const apiErr = err as ApiError;
+      toast.error('Failed to delete emails');
+      console.error('[Mail] Bulk delete error:', apiErr);
+      return { total: messageIds.length, failed: messageIds.length };
+    } finally {
+      setLoading((prev) => ({ ...prev, bulkDeleting: false }));
+    }
+  }, [selectedMessage]);
+
   const refreshMessages = useCallback(() => {
     fetchMessages();
     toast.success('Refreshed');
@@ -385,6 +430,7 @@ export function useMailApi() {
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
+    bulkDeleteMessages,
     clearInbox,
     fetchDomains,
     getInboxEmail,
