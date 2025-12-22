@@ -72,7 +72,7 @@ export function RichTextEditor({
       }),
     ],
     content: value,
-    editable: true, // Ensure always editable
+    editable: true,
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 text-foreground',
@@ -85,17 +85,34 @@ export function RichTextEditor({
 
   // Sync external value changes (e.g., draft restoration)
   useEffect(() => {
-    if (editor && editor.isEditable) {
+    if (editor) {
       const currentContent = editor.getHTML();
       // Only update if content actually changed (avoid unnecessary updates)
       if (value !== currentContent) {
-        // Use setTimeout to avoid React state update conflicts
-        setTimeout(() => {
-          editor.commands.setContent(value, { emitUpdate: false });
-        }, 0);
+        // Use queueMicrotask for better timing than setTimeout
+        queueMicrotask(() => {
+          if (editor && !editor.isDestroyed) {
+            editor.commands.setContent(value, { emitUpdate: false });
+          }
+        });
       }
     }
   }, [value, editor]);
+
+  // Ensure editor stays editable after window focus changes
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleFocus = () => {
+      // Re-enable editor if it somehow got disabled
+      if (editor && !editor.isDestroyed && !editor.isEditable) {
+        editor.setEditable(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [editor]);
 
   const setLink = useCallback(() => {
     if (!editor) return;
