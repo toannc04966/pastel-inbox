@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { apiFetch, ApiError } from '@/lib/api';
+import { apiFetch, ApiError, API_BASE } from '@/lib/api';
 import type { SentMessagePreview, SentMessage, SendEmailPayload, SendEmailResponse } from '@/types/sent';
 import type { ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
@@ -185,7 +185,7 @@ export function useSentApi() {
           formData.append(`attachment_${index}`, file);
         });
 
-        const response = await fetch(`${import.meta.env.VITE_API_BASE || ''}/api/v1/send`, {
+        const response = await fetch(`${API_BASE}/api/v1/send`, {
           method: 'POST',
           credentials: 'include',
           body: formData,
