@@ -127,7 +127,8 @@ export function ComposeModal({
       return json.data as SendConfig;
     },
     enabled: open,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const allowedDomains = configData?.allowedDomains || [];
@@ -372,13 +373,13 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     );
   }
 
-  // Show error or no permission state
-  if (configError || allowedDomains.length === 0) {
+  // Show error state only for actual config errors
+  if (configError) {
     const errorContent = (
       <Alert variant="destructive" className="m-4">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          {configError ? 'Failed to load email configuration.' : 'You do not have permission to send emails.'}
+          Failed to load email configuration. Please try again.
         </AlertDescription>
       </Alert>
     );
