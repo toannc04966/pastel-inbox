@@ -72,6 +72,7 @@ export function RichTextEditor({
       }),
     ],
     content: value,
+    editable: true, // Ensure always editable
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[200px] p-4 text-foreground',
@@ -82,10 +83,17 @@ export function RichTextEditor({
     },
   });
 
-  // Sync external value changes
+  // Sync external value changes (e.g., draft restoration)
   useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value);
+    if (editor && editor.isEditable) {
+      const currentContent = editor.getHTML();
+      // Only update if content actually changed (avoid unnecessary updates)
+      if (value !== currentContent) {
+        // Use setTimeout to avoid React state update conflicts
+        setTimeout(() => {
+          editor.commands.setContent(value, { emitUpdate: false });
+        }, 0);
+      }
     }
   }, [value, editor]);
 
