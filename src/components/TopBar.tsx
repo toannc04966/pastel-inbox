@@ -1,4 +1,4 @@
-import { Mail, RefreshCw, Pause, Play, Trash2, X } from 'lucide-react';
+import { Mail, RefreshCw, Pause, Play, Trash2, X, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -224,8 +224,29 @@ export function TopBar({
           </AlertDialog>
         )}
 
+        {/* Compose Button - Desktop */}
+        {onCompose && (
+          <Button
+            onClick={onCompose}
+            className="hidden md:flex items-center gap-2 rounded-xl h-10 px-5 bg-[#3B82F6] hover:bg-[#2563EB] text-white font-medium"
+          >
+            <Pencil className="w-4 h-4" />
+            <span>Compose</span>
+          </Button>
+        )}
+
         {/* Theme Toggle */}
         <ThemeToggle />
+
+        {/* Compose FAB - Mobile */}
+        {onCompose && (
+          <Button
+            onClick={onCompose}
+            className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#3B82F6] hover:bg-[#2563EB] text-white shadow-lg z-50 p-0"
+          >
+            <Pencil className="w-6 h-6" />
+          </Button>
+        )}
 
         {/* Language Toggle */}
         <LanguageToggle />
