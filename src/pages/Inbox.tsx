@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
+import { API_BASE } from '@/lib/api';
 import { useSentApi } from '@/hooks/useSentApi';
 import { useRecentEmails } from '@/hooks/useRecentEmails';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -84,6 +86,21 @@ const Inbox = () => {
     fetchMessages,
     30000
   );
+
+  // Fetch send config to check if user has only SELF_ONLY mode
+  const { data: sendConfigData } = useQuery({
+    queryKey: ['send-config'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/api/v1/send/config`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch send config');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    enabled: isAuthenticated,
+  });
+
+  const hasOnlySelfOnlyMode = sendConfigData?.data?.hasOnlySelfOnlyMode || false;
 
   // Wrap domain change to update accent color and reset mobile view
   const handleDomainChange = (domain: string) => {
@@ -349,12 +366,13 @@ const Inbox = () => {
 
       <div className="flex-1 p-2 md:p-6 overflow-hidden">
         <div className="pastel-card flex-1 overflow-hidden h-[calc(100vh-88px)] md:h-[calc(100vh-140px)] flex flex-col">
-          {/* Mailbox Tabs */}
+          {/* Mailbox Tabs - Hidden for SELF_ONLY users */}
           <MailboxTabs
             activeTab={activeTab}
             onTabChange={handleTabChange}
             inboxCount={messages.length}
             sentCount={sentMessages.length}
+            hidden={hasOnlySelfOnlyMode}
           />
 
           {isMobile ? (

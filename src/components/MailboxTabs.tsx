@@ -8,6 +8,7 @@ interface MailboxTabsProps {
   onTabChange: (tab: MailboxTab) => void;
   inboxCount?: number;
   sentCount?: number;
+  hidden?: boolean;
 }
 
 export function MailboxTabs({
@@ -15,7 +16,13 @@ export function MailboxTabs({
   onTabChange,
   inboxCount,
   sentCount,
+  hidden = false,
 }: MailboxTabsProps) {
+  // Don't render tabs if hidden (SELF_ONLY users)
+  if (hidden) {
+    return null;
+  }
+
   return (
     <div className="flex border-b border-border/50 bg-card/50">
       <button
