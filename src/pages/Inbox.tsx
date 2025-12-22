@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
+import { useSentApi } from '@/hooks/useSentApi';
 import { useRecentEmails } from '@/hooks/useRecentEmails';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useReadState } from '@/hooks/useReadState';
@@ -13,6 +14,13 @@ import { MessageViewer } from '@/components/MessageViewer';
 import { AddressOnlyInput } from '@/components/AddressOnlyInput';
 import { ErrorBanner } from '@/components/ErrorBanner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MailboxTabs, MailboxTab } from '@/components/MailboxTabs';
+import { SentList } from '@/components/SentList';
+import { SentMessageViewer } from '@/components/SentMessageViewer';
+import { ComposeModal } from '@/components/ComposeModal';
+import { Button } from '@/components/ui/button';
+import { PenSquare } from 'lucide-react';
+import type { Message } from '@/types/mail';
 
 const Inbox = () => {
   const navigate = useNavigate();
@@ -22,6 +30,11 @@ const Inbox = () => {
   
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<MailboxTab>('inbox');
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [replyAll, setReplyAll] = useState(false);
+  const [forward, setForward] = useState<Message | null>(null);
 
   const {
     domains,
@@ -48,6 +61,18 @@ const Inbox = () => {
     getPermissionMode,
   } = useMailApi();
 
+  const {
+    sentMessages,
+    selectedSentMessage,
+    hasMore: hasMoreSent,
+    loading: sentLoading,
+    error: sentError,
+    fetchSentMessages,
+    loadMoreSent,
+    fetchSentMessage,
+    setSelectedSentMessage,
+  } = useSentApi();
+
   const { addRecentEmail, getRecentEmails, removeRecentEmail } = useRecentEmails();
   const { isRead, markAsRead, markAsUnread, clearReadState } = useReadState();
   
@@ -60,7 +85,6 @@ const Inbox = () => {
   const handleDomainChange = (domain: string) => {
     originalHandleDomainChange(domain);
     setDomainAccent(domain);
-    // Reset to list view on mobile when changing domain
     if (isMobile) {
       setMobileView('list');
       setSelectedMessage(null);
@@ -71,8 +95,6 @@ const Inbox = () => {
   const handleEmailSubmit = async (email: string) => {
     const count = await fetchMessagesByEmail(email);
     addRecentEmail(selectedDomain, email, count);
-    
-    // Stay on list view for mobile
     if (isMobile) {
       setMobileView('list');
     }
@@ -80,11 +102,15 @@ const Inbox = () => {
 
   // Wrap refresh to reset mobile view
   const handleRefresh = () => {
-    refreshMessages();
-    // Reset to list view on mobile when refreshing
+    if (activeTab === 'inbox') {
+      refreshMessages();
+    } else {
+      fetchSentMessages(true);
+    }
     if (isMobile) {
       setMobileView('list');
       setSelectedMessage(null);
+      setSelectedSentMessage(null);
     }
   };
 
@@ -93,7 +119,6 @@ const Inbox = () => {
     const success = await clearInbox();
     if (success) {
       clearReadState();
-      // Reset to list view on mobile when clearing inbox
       if (isMobile) {
         setMobileView('list');
         setSelectedMessage(null);
@@ -113,6 +138,13 @@ const Inbox = () => {
       fetchMessages();
     }
   }, [fetchMessages, currentPermissionMode, selectedDomain]);
+
+  // Fetch sent messages when tab changes to sent
+  useEffect(() => {
+    if (activeTab === 'sent' && sentMessages.length === 0) {
+      fetchSentMessages(true);
+    }
+  }, [activeTab, fetchSentMessages, sentMessages.length]);
 
   // Set initial domain accent
   useEffect(() => {
@@ -134,13 +166,47 @@ const Inbox = () => {
     }
   };
 
+  const handleSelectSentMessage = (id: string) => {
+    fetchSentMessage(id);
+    if (isMobile) {
+      setMobileView('viewer');
+    }
+  };
+
   const handleBackToList = () => {
     setMobileView('list');
     setSelectedMessage(null);
+    setSelectedSentMessage(null);
   };
 
   const handleMarkAsUnread = (id: string) => {
     markAsUnread(id);
+  };
+
+  const handleTabChange = (tab: MailboxTab) => {
+    setActiveTab(tab);
+    setMobileView('list');
+    setSelectedMessage(null);
+    setSelectedSentMessage(null);
+  };
+
+  const handleComposeSent = () => {
+    setActiveTab('sent');
+    fetchSentMessages(true);
+  };
+
+  const handleReply = (message: Message, all: boolean = false) => {
+    setReplyTo(message);
+    setReplyAll(all);
+    setForward(null);
+    setComposeOpen(true);
+  };
+
+  const handleForward = (message: Message) => {
+    setForward(message);
+    setReplyTo(null);
+    setReplyAll(false);
+    setComposeOpen(true);
   };
 
   // Show loading skeleton while checking auth
@@ -165,18 +231,25 @@ const Inbox = () => {
   }
 
   const inboxEmail = getInboxEmail();
-
-  // Determine if we should show the address input (ADDRESS_ONLY without email selected)
   const showAddressInput = currentPermissionMode === 'ADDRESS_ONLY' && !selectedEmail;
-  
-  // Show domain badge when viewing "all" domains
   const showDomainBadge = selectedDomain === 'all';
-  
-  // Get recent emails for current domain
   const recentEmails = getRecentEmails(selectedDomain);
 
   // Render the message list or address input based on mode
   const renderListPanel = () => {
+    if (activeTab === 'sent') {
+      return (
+        <SentList
+          messages={sentMessages}
+          selectedId={selectedSentMessage?.id || null}
+          onSelect={handleSelectSentMessage}
+          loading={sentLoading.list}
+          hasMore={hasMoreSent}
+          onLoadMore={loadMoreSent}
+        />
+      );
+    }
+
     if (showAddressInput) {
       return (
         <AddressOnlyInput
@@ -203,6 +276,34 @@ const Inbox = () => {
     );
   };
 
+  const renderViewerPanel = () => {
+    if (activeTab === 'sent') {
+      return (
+        <SentMessageViewer
+          message={selectedSentMessage}
+          loading={sentLoading.detail}
+          onBack={handleBackToList}
+          showBackButton={isMobile}
+        />
+      );
+    }
+
+    return (
+      <MessageViewer
+        message={selectedMessage}
+        loading={loading.message}
+        deleting={loading.deleting}
+        onBack={handleBackToList}
+        onDelete={deleteMessage}
+        onMarkAsUnread={handleMarkAsUnread}
+        showBackButton={isMobile}
+        onReply={() => selectedMessage && handleReply(selectedMessage)}
+        onReplyAll={() => selectedMessage && handleReply(selectedMessage, true)}
+        onForward={() => selectedMessage && handleForward(selectedMessage)}
+      />
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar
@@ -224,49 +325,68 @@ const Inbox = () => {
         onToggleAutoRefresh={toggleAutoRefresh}
         messageCount={messages.length}
         getPermissionMode={getPermissionMode}
+        onCompose={() => {
+          setReplyTo(null);
+          setReplyAll(false);
+          setForward(null);
+          setComposeOpen(true);
+        }}
       />
 
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
+      {(error || sentError) && <ErrorBanner message={error || sentError || ''} onDismiss={() => setError(null)} />}
 
       <div className="flex-1 p-2 md:p-6 overflow-hidden">
-        {/* Main Content - Responsive Layout */}
-        <div className="pastel-card flex-1 overflow-hidden h-[calc(100vh-88px)] md:h-[calc(100vh-140px)]">
+        <div className="pastel-card flex-1 overflow-hidden h-[calc(100vh-88px)] md:h-[calc(100vh-140px)] flex flex-col">
+          {/* Mailbox Tabs */}
+          <MailboxTabs
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            inboxCount={messages.length}
+            sentCount={sentMessages.length}
+          />
+
           {isMobile ? (
-            // Mobile: Single column, switch between list and detail
-            <div className="h-full overflow-hidden">
-              {mobileView === 'list' ? (
-                renderListPanel()
-              ) : (
-                <MessageViewer
-                  message={selectedMessage}
-                  loading={loading.message}
-                  deleting={loading.deleting}
-                  onBack={handleBackToList}
-                  onDelete={deleteMessage}
-                  onMarkAsUnread={handleMarkAsUnread}
-                  showBackButton
-                />
-              )}
+            <div className="flex-1 overflow-hidden">
+              {mobileView === 'list' ? renderListPanel() : renderViewerPanel()}
             </div>
           ) : (
-            // Desktop: Two Column Layout
-            <div className="flex h-full">
-              <div className="w-[380px] border-r border-border/50 flex-shrink-0">
+            <div className="flex flex-1 overflow-hidden">
+              <div className="w-[380px] border-r border-border/50 flex-shrink-0 overflow-hidden">
                 {renderListPanel()}
               </div>
               <div className="flex-1 overflow-hidden">
-                <MessageViewer
-                  message={selectedMessage}
-                  loading={loading.message}
-                  deleting={loading.deleting}
-                  onDelete={deleteMessage}
-                  onMarkAsUnread={handleMarkAsUnread}
-                />
+                {renderViewerPanel()}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Mobile FAB */}
+      {isMobile && mobileView === 'list' && (
+        <Button
+          size="lg"
+          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg z-50"
+          onClick={() => {
+            setReplyTo(null);
+            setReplyAll(false);
+            setForward(null);
+            setComposeOpen(true);
+          }}
+        >
+          <PenSquare className="w-6 h-6" />
+        </Button>
+      )}
+
+      {/* Compose Modal */}
+      <ComposeModal
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        onSent={handleComposeSent}
+        replyTo={replyTo}
+        replyAll={replyAll}
+        forward={forward}
+      />
     </div>
   );
 };
