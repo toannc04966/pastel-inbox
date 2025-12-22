@@ -132,7 +132,12 @@ const Inbox = () => {
   // Wrap refresh to reset mobile view
   const handleRefresh = () => {
     if (activeTab === 'inbox') {
-      refreshMessages();
+      // SELF_ONLY users: always refresh by their email
+      if (hasOnlySelfOnlyMode && selfOnlyEmail) {
+        fetchMessagesByEmail(selfOnlyEmail);
+      } else {
+        refreshMessages();
+      }
     } else {
       fetchSentMessages(true);
     }
