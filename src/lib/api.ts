@@ -1,4 +1,4 @@
-const API_BASE = 'https://bpink-mail.ahn2k22.workers.dev';
+export const API_BASE = 'https://bpink-mail.ahn2k22.workers.dev';
 
 export interface ApiError {
   message: string;

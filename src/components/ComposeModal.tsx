@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -21,25 +22,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmailChipsInput } from '@/components/EmailChipsInput';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSentApi, ERROR_MESSAGES } from '@/hooks/useSentApi';
 import { useAuth } from '@/hooks/useAuth';
+import { API_BASE } from '@/lib/api';
 import DOMPurify from 'dompurify';
-import { ChevronDown, ChevronUp, Loader2, Send, Clock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Send, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ComposeDraft, SendEmailPayload } from '@/types/sent';
 import type { Message } from '@/types/mail';
 import { format } from 'date-fns';
 
-const DEFAULT_FROM = 'no-reply@nuoicpa.online';
-const FROM_DOMAIN = '@nuoicpa.online';
+interface SendConfig {
+  allowedDomains: string[];
+  defaultFrom: string;
+  rateLimit: { maxEmails: number; windowMinutes: number };
+}
+
 const MAX_SUBJECT_LENGTH = 200;
 const DRAFT_STORAGE_KEY = 'bpink_compose_draft';
 
@@ -99,7 +113,24 @@ export function ComposeModal({
   const { user } = useAuth();
   const { sendEmail, loading, rateLimit } = useSentApi();
 
-  const [from, setFrom] = useState(DEFAULT_FROM);
+  // Fetch send config from backend
+  const { data: configData, isLoading: configLoading, error: configError } = useQuery({
+    queryKey: ['send-config'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/send/config`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch config');
+      const json = await res.json();
+      return json.data as SendConfig;
+    },
+    enabled: open,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  const allowedDomains = configData?.allowedDomains || [];
+  const defaultFrom = configData?.defaultFrom || '';
+
+  const [fromUsername, setFromUsername] = useState('');
+  const [selectedDomain, setSelectedDomain] = useState('');
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [bcc, setBcc] = useState<string[]>([]);
@@ -111,23 +142,27 @@ export function ComposeModal({
   const [editorTab, setEditorTab] = useState<'visual' | 'html' | 'preview'>('visual');
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
-  const [fromError, setFromError] = useState('');
 
-  const hasContent = to.length > 0 || subject.trim() || htmlContent.trim() || textContent.trim();
+  // Computed full from address
+  const from = fromUsername && selectedDomain ? `${fromUsername}@${selectedDomain}` : '';
 
-  // Validate from address
-  const validateFrom = (value: string): boolean => {
-    if (!value.endsWith(FROM_DOMAIN)) {
-      setFromError(`From address must end with ${FROM_DOMAIN}`);
-      return false;
+  const hasContent = to.length > 0 || subject.trim() || htmlContent.trim() || textContent.trim() || fromUsername.trim();
+
+  // Set default domain when config loads
+  useEffect(() => {
+    if (allowedDomains.length > 0 && !selectedDomain) {
+      setSelectedDomain(allowedDomains[0]);
     }
-    setFromError('');
-    return true;
-  };
+    if (defaultFrom && !fromUsername) {
+      const [username] = defaultFrom.split('@');
+      if (username) setFromUsername(username);
+    }
+  }, [allowedDomains, defaultFrom, selectedDomain, fromUsername]);
 
   // Check if form is valid
   const isValid = useCallback((): boolean => {
-    if (!from.endsWith(FROM_DOMAIN)) return false;
+    if (!fromUsername.trim()) return false;
+    if (!selectedDomain) return false;
     if (to.length === 0) return false;
     if (!to.every(e => EMAIL_REGEX.test(e))) return false;
     if (cc.length > 0 && !cc.every(e => EMAIL_REGEX.test(e))) return false;
@@ -136,14 +171,21 @@ export function ComposeModal({
     if (subject.length > MAX_SUBJECT_LENGTH) return false;
     if (!htmlContent.trim() && !textContent.trim()) return false;
     return true;
-  }, [from, to, cc, bcc, replyToEmail, subject, htmlContent, textContent]);
+  }, [fromUsername, selectedDomain, to, cc, bcc, replyToEmail, subject, htmlContent, textContent]);
 
   // Load draft on mount
   useEffect(() => {
     if (open && !replyTo && !forward) {
       const draft = loadDraft(user?.id);
       if (draft && draft.savedAt) {
-        setFrom(draft.from || DEFAULT_FROM);
+        // Parse from address into username and domain
+        if (draft.from) {
+          const [username, domain] = draft.from.split('@');
+          if (username) setFromUsername(username);
+          if (domain && allowedDomains.includes(domain)) {
+            setSelectedDomain(domain);
+          }
+        }
         setTo(draft.to || []);
         setCc(draft.cc || []);
         setBcc(draft.bcc || []);
@@ -157,7 +199,7 @@ export function ComposeModal({
         }
       }
     }
-  }, [open, user?.id, replyTo, forward]);
+  }, [open, user?.id, replyTo, forward, allowedDomains]);
 
   // Handle reply/forward prefill
   useEffect(() => {
@@ -237,7 +279,16 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
   };
 
   const resetForm = () => {
-    setFrom(DEFAULT_FROM);
+    // Reset to defaults from config
+    if (defaultFrom) {
+      const [username] = defaultFrom.split('@');
+      setFromUsername(username || '');
+    } else {
+      setFromUsername('');
+    }
+    if (allowedDomains.length > 0) {
+      setSelectedDomain(allowedDomains[0]);
+    }
     setTo([]);
     setCc([]);
     setBcc([]);
@@ -247,7 +298,6 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     setTextContent('');
     setShowCcBcc(false);
     setDraftRestored(false);
-    setFromError('');
   };
 
   const handleSend = async () => {
@@ -287,6 +337,69 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     return { remaining: rateLimit.limit, resetMinutes: 0, isLimited: false };
   })();
 
+  // Show loading state
+  if (configLoading) {
+    return isMobile ? (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="h-[95vh] p-0">
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        </SheetContent>
+      </Sheet>
+    ) : (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl h-[80vh]">
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Show error or no permission state
+  if (configError || allowedDomains.length === 0) {
+    const errorContent = (
+      <Alert variant="destructive" className="m-4">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          {configError ? 'Failed to load email configuration.' : 'You do not have permission to send emails.'}
+        </AlertDescription>
+      </Alert>
+    );
+
+    return isMobile ? (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="h-auto p-0">
+          <SheetHeader className="px-4 py-3 border-b border-border">
+            <SheetTitle>Compose Email</SheetTitle>
+          </SheetHeader>
+          {errorContent}
+          <div className="p-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
+              Close
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    ) : (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Compose Email</DialogTitle>
+          </DialogHeader>
+          {errorContent}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const content = (
     <div className="flex flex-col h-full max-h-[80vh]">
       {/* Rate limit indicator */}
@@ -323,20 +436,39 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
       )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* From */}
+        {/* From - Username + Domain Dropdown */}
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">From</label>
-          <Input
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              validateFrom(e.target.value);
-            }}
-            onBlur={() => validateFrom(from)}
-            placeholder={DEFAULT_FROM}
-            className={cn(fromError && 'border-destructive')}
-          />
-          {fromError && <p className="text-xs text-destructive mt-1">{fromError}</p>}
+          <div className="flex items-center gap-2">
+            <Input
+              value={fromUsername}
+              onChange={(e) => setFromUsername(e.target.value.replace(/[^a-zA-Z0-9._-]/g, ''))}
+              placeholder="username"
+              className="flex-1"
+            />
+            <span className="text-muted-foreground font-medium">@</span>
+            <Select 
+              value={selectedDomain} 
+              onValueChange={setSelectedDomain}
+              disabled={allowedDomains.length <= 1}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select domain" />
+              </SelectTrigger>
+              <SelectContent>
+                {allowedDomains.map((domain) => (
+                  <SelectItem key={domain} value={domain}>
+                    {domain}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {fromUsername && selectedDomain && (
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Email will be sent from: <span className="font-medium text-foreground">{from}</span>
+            </p>
+          )}
         </div>
 
         {/* To */}
