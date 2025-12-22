@@ -5,7 +5,7 @@ export interface Inbox {
   createdAt: string;
 }
 
-export type PermissionMode = 'ALL_INBOXES' | 'ADDRESS_ONLY';
+export type PermissionMode = 'ALL_INBOXES' | 'ADDRESS_ONLY' | 'SELF_ONLY';
 
 export interface DomainPermission {
   domain: string;

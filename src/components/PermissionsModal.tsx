@@ -527,6 +527,11 @@ export function PermissionsModal({
                                 <span className="w-2 h-2 rounded-full bg-green-500" />
                                 <span className="text-sm">All Inboxes</span>
                               </span>
+                            ) : perm.mode === 'SELF_ONLY' ? (
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                <span className="text-sm">Own Email Only</span>
+                              </span>
                             ) : (
                               <span className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-amber-500" />
@@ -554,6 +559,15 @@ export function PermissionsModal({
                               <span className="text-xs text-muted-foreground">Must specify email to view</span>
                             </div>
                           </SelectItem>
+                          <SelectItem value="SELF_ONLY">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                Own Email Only
+                              </span>
+                              <span className="text-xs text-muted-foreground">Only view/send from own email</span>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -579,14 +593,18 @@ export function PermissionsModal({
             {/* Mode explanation */}
             <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
               <p className="font-medium mb-1">{t('permissionModes')}:</p>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 <li className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="font-medium">All Inboxes</span> — {t('allInboxesDesc')}
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span><span className="font-medium">All Inboxes</span> — {t('allInboxesDesc')}</span>
                 </li>
                 <li className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="font-medium">Address Only</span> — {t('addressOnlyDesc')}
+                  <span className="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0" />
+                  <span><span className="font-medium">Address Only</span> — {t('addressOnlyDesc')}</span>
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                  <span><span className="font-medium">Own Email Only</span> — User can only view/send from their own email address</span>
                 </li>
               </ul>
             </div>
@@ -668,6 +686,17 @@ export function PermissionsModal({
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
                       User will NOT be able to send emails if no domains are selected.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {sendDomains.length > 0 && (
+                  <Alert className="bg-blue-500/10 border-blue-500/20">
+                    <AlertCircle className="h-4 w-4 text-blue-500" />
+                    <AlertDescription className="text-blue-700 dark:text-blue-300">
+                      💡 If user has <strong>Own Email Only</strong> view permission on a domain, 
+                      they can only send from their own email address ({userEmail}) 
+                      even if granted send permission for that domain.
                     </AlertDescription>
                   </Alert>
                 )}
