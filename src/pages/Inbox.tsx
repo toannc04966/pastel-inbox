@@ -101,6 +101,14 @@ const Inbox = () => {
   });
 
   const hasOnlySelfOnlyMode = sendConfigData?.data?.hasOnlySelfOnlyMode || false;
+  const selfOnlyEmail = sendConfigData?.data?.defaultFrom || '';
+
+  // For SELF_ONLY users, auto-fetch their inbox by email
+  useEffect(() => {
+    if (hasOnlySelfOnlyMode && selfOnlyEmail && !selectedEmail) {
+      fetchMessagesByEmail(selfOnlyEmail);
+    }
+  }, [hasOnlySelfOnlyMode, selfOnlyEmail, selectedEmail, fetchMessagesByEmail]);
 
   // Wrap domain change to update accent color and reset mobile view
   const handleDomainChange = (domain: string) => {
@@ -205,6 +213,9 @@ const Inbox = () => {
   };
 
   const handleTabChange = (tab: MailboxTab) => {
+    // Prevent navigation to tabs for SELF_ONLY users
+    if (hasOnlySelfOnlyMode) return;
+    
     setActiveTab(tab);
     setMobileView('list');
     setSelectedMessage(null);
