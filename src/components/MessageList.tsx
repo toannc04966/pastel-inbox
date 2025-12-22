@@ -1,9 +1,28 @@
-import { Search, Inbox } from 'lucide-react';
+import { Search, Inbox, Trash2, Check } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import type { MessagePreview } from '@/types/mail';
 
 // Extract friendly sender name with simple priority: sender_name > sender_email > from
@@ -32,6 +51,10 @@ interface MessageListProps {
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   showDomainBadge?: boolean;
+  onDelete?: (id: string) => Promise<boolean>;
+  onBulkDelete?: (ids: string[]) => Promise<{ total: number; failed: number }>;
+  deleting?: boolean;
+  bulkDeleting?: boolean;
 }
 
 function SkeletonRow() {
@@ -53,9 +76,22 @@ export function MessageList({
   searchQuery: externalSearch,
   onSearchChange,
   showDomainBadge = false,
+  onDelete,
+  onBulkDelete,
+  deleting = false,
+  bulkDeleting = false,
 }: MessageListProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const { t } = useLanguage();
+  
+  // Select mode state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<MessagePreview | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   
   // Use external search if provided, otherwise internal
   const search = externalSearch !== undefined ? externalSearch : internalSearch;
@@ -70,6 +106,11 @@ export function MessageList({
     }, 150);
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Reset select mode when messages change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [messages]);
 
   const filteredMessages = useMemo(() => {
     if (!debouncedSearch.trim()) return messages;
@@ -91,10 +132,120 @@ export function MessageList({
     }
   };
 
+  // Handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allIds = filteredMessages.map(m => m.id);
+    if (selectedIds.size === filteredMessages.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allIds));
+    }
+  };
+
+  const handleSingleDelete = (message: MessagePreview, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setItemToDelete(message);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmSingleDelete = async () => {
+    if (itemToDelete && onDelete) {
+      await onDelete(itemToDelete.id);
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    if (onBulkDelete && selectedIds.size > 0) {
+      await onBulkDelete(Array.from(selectedIds));
+      setBulkDeleteDialogOpen(false);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+    }
+  };
+
+  const handleCancelSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Search Input */}
+      {/* Header with Select Mode Controls */}
       <div className="px-3 py-2.5 border-b border-border/50 theme-transition">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-sm font-medium text-foreground">
+            {selectMode 
+              ? `${selectedIds.size} selected`
+              : `${filteredMessages.length} ${filteredMessages.length === 1 ? 'message' : 'messages'}`
+            }
+          </span>
+          
+          <div className="flex items-center gap-1">
+            {selectMode ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAll}
+                  className="h-7 text-xs"
+                >
+                  {selectedIds.size === filteredMessages.length ? 'Unselect All' : 'Select All'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelSelectMode}
+                  className="h-7 text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedIds.size === 0 || bulkDeleting}
+                  onClick={handleBulkDelete}
+                  className="h-7 text-xs"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  {bulkDeleting ? 'Deleting...' : `Delete (${selectedIds.size})`}
+                </Button>
+              </>
+            ) : (
+              onDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectMode(true)}
+                  className="h-7 text-xs"
+                >
+                  <Check className="h-3 w-3 mr-1" />
+                  Select
+                </Button>
+              )
+            )}
+          </div>
+        </div>
+        
+        {/* Search Input */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 md:w-3.5 h-4 md:h-3.5 text-muted-foreground" />
           <Input
@@ -127,56 +278,165 @@ export function MessageList({
           <div className="divide-y divide-border/50">
             {filteredMessages.map((message) => {
               const messageIsRead = isRead ? isRead(message.id) : true;
+              const isSelected = selectedIds.has(message.id);
               
               return (
-              <button
+                <div
                   key={message.id}
-                  onClick={() => onSelect(message.id)}
-                  className={`w-full text-left px-3 py-2.5 md:py-2 message-hover theme-transition ${
-                    selectedId === message.id ? 'message-selected' : ''
-                  }`}
+                  onClick={() => {
+                    if (selectMode) {
+                      handleToggleSelect(message.id);
+                    } else {
+                      onSelect(message.id);
+                    }
+                  }}
+                  className={cn(
+                    "w-full text-left px-3 py-2.5 md:py-2 message-hover theme-transition cursor-pointer group relative",
+                    selectedId === message.id && !selectMode && 'message-selected',
+                    isSelected && selectMode && 'bg-primary/10 border-l-4 border-primary'
+                  )}
                   title={`${t('from')} ${message.from}\n${message.subject || t('noSubject')}`}
                 >
-                  <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                    <span className={`text-sm md:text-[13px] truncate max-w-[65%] md:max-w-[180px] ${
-                      messageIsRead 
-                        ? 'font-normal text-foreground' 
-                        : 'font-semibold text-foreground'
-                    }`}>
-                      {getSenderLabel(message)}
-                    </span>
-                    <span className="text-xs md:text-[11px] text-muted-foreground shrink-0">
-                      {formatTime(message.receivedAt)}
-                    </span>
-                  </div>
-                  <p className={`text-sm md:text-[13px] truncate mb-0.5 ${
-                    messageIsRead 
-                      ? 'font-normal text-muted-foreground' 
-                      : 'font-semibold text-foreground'
-                  }`}>
-                    {message.subject || t('noSubject')}
-                  </p>
-                  {message.preview && (
-                    <p className="text-xs md:text-[11px] text-muted-foreground truncate">
-                      {message.preview}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {!messageIsRead && (
-                      <span className="inline-block w-2 h-2 rounded-full bg-primary theme-transition" />
+                  <div className="flex items-start gap-2">
+                    {/* Checkbox in select mode */}
+                    {selectMode && (
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => handleToggleSelect(message.id)}
+                        className="h-5 w-5 mt-0.5 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label="Select email"
+                      />
                     )}
-                    {showDomainBadge && message.domain && (
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
-                        @{message.domain}
-                      </Badge>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className={cn(
+                                "text-sm md:text-[13px] truncate max-w-[65%] md:max-w-[180px]",
+                                messageIsRead 
+                                  ? 'font-normal text-foreground' 
+                                  : 'font-semibold text-foreground'
+                              )}>
+                                {getSenderLabel(message)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{message.from}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <span className="text-xs md:text-[11px] text-muted-foreground shrink-0">
+                          {formatTime(message.receivedAt)}
+                        </span>
+                      </div>
+                      <p className={cn(
+                        "text-sm md:text-[13px] truncate mb-0.5",
+                        messageIsRead 
+                          ? 'font-normal text-muted-foreground' 
+                          : 'font-semibold text-foreground'
+                      )}>
+                        {message.subject || t('noSubject')}
+                      </p>
+                      {message.preview && (
+                        <p className="text-xs md:text-[11px] text-muted-foreground truncate">
+                          {message.preview}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {!messageIsRead && (
+                          <span className="inline-block w-2 h-2 rounded-full bg-primary theme-transition" />
+                        )}
+                        {showDomainBadge && message.domain && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground border-muted-foreground/30">
+                            @{message.domain}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Single delete button (hidden in select mode) */}
+                    {!selectMode && onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => handleSingleDelete(message, e)}
+                        disabled={deleting}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        aria-label="Delete email"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Single Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>⚠️ Delete Email?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>Are you sure you want to delete this email?</p>
+                {itemToDelete && (
+                  <div className="bg-muted p-2 rounded text-sm">
+                    <p><strong>From:</strong> {getSenderLabel(itemToDelete)}</p>
+                    <p><strong>Subject:</strong> {itemToDelete.subject || '(No Subject)'}</p>
+                  </div>
+                )}
+                <p className="text-destructive">This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSingleDelete}
+              disabled={deleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              ⚠️ Delete {selectedIds.size} Email{selectedIds.size > 1 ? 's' : ''}?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Are you sure you want to delete {selectedIds.size} selected email{selectedIds.size > 1 ? 's' : ''}?
+                </p>
+                <p className="text-destructive">This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmBulkDelete}
+              disabled={bulkDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {bulkDeleting ? 'Deleting...' : 'Delete All'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

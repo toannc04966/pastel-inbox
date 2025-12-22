@@ -54,6 +54,7 @@ const Inbox = () => {
     setSelectedMessage,
     refreshMessages,
     deleteMessage,
+    bulkDeleteMessages,
     clearInbox,
     fetchDomains,
     fetchMessages,
@@ -278,6 +279,10 @@ const Inbox = () => {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         showDomainBadge={showDomainBadge}
+        onDelete={deleteMessage}
+        onBulkDelete={bulkDeleteMessages}
+        deleting={loading.deleting}
+        bulkDeleting={loading.bulkDeleting}
       />
     );
   };
