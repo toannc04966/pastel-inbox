@@ -117,8 +117,11 @@ export function ComposeModal({
   const { data: configData, isLoading: configLoading, error: configError } = useQuery({
     queryKey: ['send-config'],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/send/config`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch config');
+      const res = await fetch(`${API_BASE}/api/v1/send/config`, { credentials: 'include' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to fetch config');
+      }
       const json = await res.json();
       return json.data as SendConfig;
     },
