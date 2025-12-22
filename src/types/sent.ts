@@ -2,6 +2,7 @@
 export interface SentMessagePreview {
   id: string;
   from_address: string;
+  sender_name?: string;
   to: string[];
   subject: string;
   status: 'sent' | 'failed';

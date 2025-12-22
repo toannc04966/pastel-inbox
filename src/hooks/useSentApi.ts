@@ -62,6 +62,8 @@ export function useSentApi() {
     list: false,
     detail: false,
     sending: false,
+    deleting: false,
+    bulkDeleting: false,
   });
   const [error, setError] = useState<string | null>(null);
   
@@ -208,6 +210,84 @@ export function useSentApi() {
     }
   }, [updateRateLimit]);
 
+  const deleteSentMessage = useCallback(async (messageId: string): Promise<boolean> => {
+    setLoading(prev => ({ ...prev, deleting: true }));
+
+    try {
+      const res = await apiFetch<ApiResponse<{ deleted: boolean; id: string }>>(
+        `/api/v1/sent/${encodeURIComponent(messageId)}`,
+        { method: 'DELETE' }
+      );
+
+      if (res.ok && res.data?.deleted) {
+        // Remove from local state
+        setSentMessages(prev => prev.filter(m => m.id !== messageId));
+        // Clear selected if deleted
+        if (selectedSentMessage?.id === messageId) {
+          setSelectedSentMessage(null);
+        }
+        toast.success('Message deleted');
+        return true;
+      }
+      
+      throw { message: 'Failed to delete message', status: 500 };
+    } catch (err) {
+      const apiErr = err as ApiError;
+      if ((apiErr as any).status === 404) {
+        toast.error('Message not found. It may have been already deleted.');
+        fetchSentMessages(true);
+      } else {
+        toast.error(apiErr.message || 'Failed to delete message');
+      }
+      return false;
+    } finally {
+      setLoading(prev => ({ ...prev, deleting: false }));
+    }
+  }, [selectedSentMessage, fetchSentMessages]);
+
+  const bulkDeleteSentMessages = useCallback(async (
+    messageIds: string[],
+    onProgress?: (current: number, total: number) => void
+  ): Promise<{ success: number; failed: number }> => {
+    setLoading(prev => ({ ...prev, bulkDeleting: true }));
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < messageIds.length; i++) {
+      const id = messageIds[i];
+      onProgress?.(i + 1, messageIds.length);
+
+      try {
+        const res = await apiFetch<ApiResponse<{ deleted: boolean; id: string }>>(
+          `/api/v1/sent/${encodeURIComponent(id)}`,
+          { method: 'DELETE' }
+        );
+
+        if (res.ok && res.data?.deleted) {
+          successCount++;
+        } else {
+          failedCount++;
+        }
+      } catch {
+        failedCount++;
+      }
+    }
+
+    // Refresh list after bulk delete
+    await fetchSentMessages(true);
+    setSelectedSentMessage(null);
+
+    if (failedCount === 0) {
+      toast.success(`${successCount} message${successCount > 1 ? 's' : ''} deleted`);
+    } else {
+      toast.warning(`${successCount}/${messageIds.length} messages deleted`);
+    }
+
+    setLoading(prev => ({ ...prev, bulkDeleting: false }));
+    return { success: successCount, failed: failedCount };
+  }, [fetchSentMessages]);
+
   const refreshSent = useCallback(() => {
     fetchSentMessages(true);
   }, [fetchSentMessages]);
@@ -226,5 +306,7 @@ export function useSentApi() {
     sendEmail,
     refreshSent,
     setSelectedSentMessage,
+    deleteSentMessage,
+    bulkDeleteSentMessages,
   };
 }
