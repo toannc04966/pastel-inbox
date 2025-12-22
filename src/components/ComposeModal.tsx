@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import {
   Dialog,
@@ -352,22 +353,63 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     return { remaining: rateLimit.limit, resetMinutes: 0, isLimited: false };
   })();
 
-  // Show loading state
+  // Loading skeleton for form fields
+  const LoadingSkeleton = () => (
+    <div className="flex flex-col h-full p-4 space-y-4">
+      {/* From field skeleton */}
+      <div>
+        <Skeleton className="h-4 w-12 mb-1.5" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 flex-1" />
+          <Skeleton className="h-4 w-3" />
+          <Skeleton className="h-10 w-[180px]" />
+        </div>
+      </div>
+      
+      {/* To field skeleton */}
+      <div>
+        <Skeleton className="h-4 w-8 mb-1.5" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      
+      {/* Subject field skeleton */}
+      <div>
+        <Skeleton className="h-4 w-16 mb-1.5" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      
+      {/* Editor skeleton */}
+      <div className="flex-1 min-h-[200px]">
+        <Skeleton className="h-4 w-20 mb-1.5" />
+        <Skeleton className="h-10 w-48 mb-2" />
+        <Skeleton className="h-[180px] w-full" />
+      </div>
+      
+      {/* Send button skeleton */}
+      <div className="flex justify-end pt-2 border-t border-border">
+        <Skeleton className="h-10 w-24" />
+      </div>
+    </div>
+  );
+
+  // Show loading state with skeleton
   if (configLoading) {
     return isMobile ? (
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="bottom" className="h-[95vh] p-0">
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
+          <SheetHeader className="px-4 py-3 border-b border-border">
+            <SheetTitle>Compose Email</SheetTitle>
+          </SheetHeader>
+          <LoadingSkeleton />
         </SheetContent>
       </Sheet>
     ) : (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl h-[80vh]">
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-          </div>
+          <DialogHeader>
+            <DialogTitle>Compose Email</DialogTitle>
+          </DialogHeader>
+          <LoadingSkeleton />
         </DialogContent>
       </Dialog>
     );
