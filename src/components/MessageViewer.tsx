@@ -63,6 +63,9 @@ interface MessageViewerProps {
   onDelete?: (id: string) => Promise<boolean>;
   onMarkAsUnread?: (id: string) => void;
   showBackButton?: boolean;
+  onReply?: () => void;
+  onReplyAll?: () => void;
+  onForward?: () => void;
 }
 
 function SkeletonViewer() {
@@ -88,6 +91,9 @@ export function MessageViewer({
   onDelete,
   onMarkAsUnread,
   showBackButton,
+  onReply,
+  onReplyAll,
+  onForward,
 }: MessageViewerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
