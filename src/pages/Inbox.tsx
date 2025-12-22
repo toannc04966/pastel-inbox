@@ -71,6 +71,8 @@ const Inbox = () => {
     loadMoreSent,
     fetchSentMessage,
     setSelectedSentMessage,
+    deleteSentMessage,
+    bulkDeleteSentMessages,
   } = useSentApi();
 
   const { addRecentEmail, getRecentEmails, removeRecentEmail } = useRecentEmails();
@@ -246,6 +248,10 @@ const Inbox = () => {
           loading={sentLoading.list}
           hasMore={hasMoreSent}
           onLoadMore={loadMoreSent}
+          onDelete={deleteSentMessage}
+          onBulkDelete={bulkDeleteSentMessages}
+          deleting={sentLoading.deleting}
+          bulkDeleting={sentLoading.bulkDeleting}
         />
       );
     }
