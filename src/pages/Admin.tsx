@@ -367,6 +367,7 @@ const Admin = () => {
         onClose={() => setPermissionsDialogOpen(false)}
         userId={selectedUser?.id || null}
         userEmail={selectedUser?.email || null}
+        isAdmin={selectedUser?.isAdmin || false}
         onSaved={fetchUsers}
       />
     </div>
