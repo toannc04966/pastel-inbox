@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -265,12 +265,20 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     }
   }, [replyTo, replyAll, forward, open, user?.email]);
 
-  // Auto-save draft
+  // Debounced auto-save draft (60 seconds after last change)
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
     if (!open) return;
     
-    const timer = setInterval(() => {
-      if (hasContent) {
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    
+    if (hasContent) {
+      // Set new timer - save after 60 seconds of inactivity
+      autoSaveTimerRef.current = setTimeout(() => {
         const draft: ComposeDraft = {
           from,
           to,
@@ -283,10 +291,14 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
           savedAt: Date.now(),
         };
         saveDraft(draft, user?.id);
-      }
-    }, 5000);
+      }, 60000); // 60 seconds
+    }
 
-    return () => clearInterval(timer);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
   }, [open, from, to, cc, bcc, replyToEmail, subject, textContent, htmlContent, hasContent, user?.id]);
 
   const handleClose = () => {
