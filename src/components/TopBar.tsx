@@ -32,6 +32,7 @@ interface TopBarProps {
   onToggleAutoRefresh?: () => void;
   messageCount?: number;
   getPermissionMode?: (domain: string) => PermissionMode | null;
+  onCompose?: () => void;
 }
 
 export function TopBar({
@@ -53,6 +54,7 @@ export function TopBar({
   onToggleAutoRefresh,
   messageCount = 0,
   getPermissionMode,
+  onCompose,
 }: TopBarProps) {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const { t } = useLanguage();
