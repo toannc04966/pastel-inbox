@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
 import { useSentApi } from '@/hooks/useSentApi';
@@ -19,7 +20,7 @@ import { SentList } from '@/components/SentList';
 import { SentMessageViewer } from '@/components/SentMessageViewer';
 import { ComposeModal } from '@/components/ComposeModal';
 import { Button } from '@/components/ui/button';
-import { PenSquare } from 'lucide-react';
+import { PenSquare, GripVertical } from 'lucide-react';
 import type { Message } from '@/types/mail';
 
 const Inbox = () => {
@@ -361,14 +362,26 @@ const Inbox = () => {
               {mobileView === 'list' ? renderListPanel() : renderViewerPanel()}
             </div>
           ) : (
-            <div className="flex flex-1 overflow-hidden">
-              <div className="w-[380px] border-r border-border/50 flex-shrink-0 overflow-hidden">
-                {renderListPanel()}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                {renderViewerPanel()}
-              </div>
-            </div>
+            <PanelGroup direction="horizontal" className="flex-1">
+              {/* Left: Message List */}
+              <Panel defaultSize={35} minSize={25} maxSize={50}>
+                <div className="h-full overflow-hidden border-r border-border/50">
+                  {renderListPanel()}
+                </div>
+              </Panel>
+
+              {/* Resize Handle */}
+              <PanelResizeHandle className="w-1.5 bg-border/30 hover:bg-primary/50 transition-colors flex items-center justify-center group">
+                <GripVertical className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+              </PanelResizeHandle>
+
+              {/* Right: Message Detail */}
+              <Panel defaultSize={65} minSize={40}>
+                <div className="h-full overflow-hidden">
+                  {renderViewerPanel()}
+                </div>
+              </Panel>
+            </PanelGroup>
           )}
         </div>
       </div>
