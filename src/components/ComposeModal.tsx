@@ -52,6 +52,7 @@ interface SendConfig {
   allowedDomains: string[];
   defaultFrom: string;
   rateLimit: { maxEmails: number; windowMinutes: number };
+  isSelfOnly?: boolean;
 }
 
 const MAX_SUBJECT_LENGTH = 200;
@@ -131,6 +132,7 @@ export function ComposeModal({
 
   const allowedDomains = configData?.allowedDomains || [];
   const defaultFrom = configData?.defaultFrom || '';
+  const isSelfOnly = configData?.isSelfOnly || false;
 
   const [fromUsername, setFromUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('');
@@ -161,6 +163,15 @@ export function ComposeModal({
       if (username) setFromUsername(username);
     }
   }, [allowedDomains, defaultFrom, selectedDomain, fromUsername]);
+
+  // Lock From inputs when isSelfOnly mode
+  useEffect(() => {
+    if (isSelfOnly && defaultFrom.includes('@')) {
+      const [user, domain] = defaultFrom.split('@');
+      if (user) setFromUsername(user);
+      if (domain) setSelectedDomain(domain);
+    }
+  }, [isSelfOnly, defaultFrom]);
 
   // Check if form is valid
   const isValid = useCallback((): boolean => {
@@ -447,15 +458,16 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
               value={fromUsername}
               onChange={(e) => setFromUsername(e.target.value.replace(/[^a-zA-Z0-9._-]/g, ''))}
               placeholder="username"
-              className="flex-1"
+              className={cn("flex-1", isSelfOnly && "bg-muted cursor-not-allowed")}
+              disabled={isSelfOnly}
             />
             <span className="text-muted-foreground font-medium">@</span>
             <Select 
               value={selectedDomain} 
               onValueChange={setSelectedDomain}
-              disabled={allowedDomains.length <= 1}
+              disabled={isSelfOnly || allowedDomains.length <= 1}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className={cn("w-[180px]", isSelfOnly && "bg-muted cursor-not-allowed")}>
                 <SelectValue placeholder="Select domain" />
               </SelectTrigger>
               <SelectContent>
@@ -467,11 +479,15 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
               </SelectContent>
             </Select>
           </div>
-          {fromUsername && selectedDomain && (
+          {isSelfOnly ? (
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5 flex items-center gap-1">
+              🔒 From address locked to: <strong>{defaultFrom}</strong>
+            </p>
+          ) : fromUsername && selectedDomain ? (
             <p className="text-xs text-muted-foreground mt-1.5">
               Email will be sent from: <span className="font-medium text-foreground">{from}</span>
             </p>
-          )}
+          ) : null}
         </div>
 
         {/* To */}
