@@ -1,4 +1,4 @@
-import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen, Paperclip, FileText } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Trash2, Loader2, Download, ChevronDown, ChevronUp, MailOpen, Paperclip, FileText, Reply, ReplyAll, Forward } from 'lucide-react';
 import { useState } from 'react';
 import DOMPurify from 'dompurify';
 import { Button } from '@/components/ui/button';
@@ -287,6 +287,37 @@ export function MessageViewer({
             
             {/* Mobile action buttons */}
             <div className="flex items-center gap-1">
+              {/* Reply buttons */}
+              {onReply && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onReply}
+                  className="h-9 w-9 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                >
+                  <Reply className="w-4 h-4" />
+                </Button>
+              )}
+              {onReplyAll && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onReplyAll}
+                  className="h-9 w-9 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                >
+                  <ReplyAll className="w-4 h-4" />
+                </Button>
+              )}
+              {onForward && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onForward}
+                  className="h-9 w-9 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                >
+                  <Forward className="w-4 h-4" />
+                </Button>
+              )}
               {onMarkAsUnread && (
                 <Button
                   variant="ghost"
@@ -415,6 +446,65 @@ export function MessageViewer({
           {/* Desktop Action Buttons - hidden on mobile when showBackButton is true */}
           {!showBackButton && (
             <div className="flex items-center gap-1 shrink-0">
+              {/* Reply buttons */}
+              {onReply && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onReply}
+                        className="h-8 w-8 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                      >
+                        <Reply className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Reply</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onReplyAll && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onReplyAll}
+                        className="h-8 w-8 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                      >
+                        <ReplyAll className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Reply All</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {onForward && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onForward}
+                        className="h-8 w-8 rounded-lg text-primary hover:text-primary hover:bg-primary/10 theme-transition"
+                      >
+                        <Forward className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Forward</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              
               {onMarkAsUnread && (
                 <TooltipProvider>
                   <Tooltip>
