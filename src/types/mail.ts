@@ -41,6 +41,8 @@ export interface Message {
   id: string;
   inboxId: string;
   from: string;
+  sender_name?: string;
+  sender_email?: string;
   to?: string | string[];
   subject: string;
   receivedAt: string;
