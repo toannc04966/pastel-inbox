@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://bpink-mail.ahn2k22.workers.dev';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.bpink.io.vn';
 
 export interface ApiError {
   message: string;
