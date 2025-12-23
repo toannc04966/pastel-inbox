@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { apiFetch, ApiError } from '@/lib/api';
 import type { User, AuthResponse } from '@/types/auth';
 import { toast } from 'sonner';
 
 export function useAuth() {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +38,9 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, password: string) => {
     setError(null);
+    // Dismiss any previous error toasts
+    toast.dismiss();
+    
     try {
       const res = await apiFetch<AuthResponse>('/api/auth/login', {
         method: 'POST',
@@ -43,6 +48,9 @@ export function useAuth() {
       });
       
       if (res.ok && res.data?.user) {
+        // Clear all React Query caches to reset stale state
+        queryClient.clear();
+        
         setUser(res.data.user);
         toast.success('Logged in successfully');
         navigate('/');
@@ -57,7 +65,7 @@ export function useAuth() {
       toast.error(apiErr.message);
       return false;
     }
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   const logout = useCallback(async () => {
     try {

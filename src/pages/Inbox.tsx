@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useMailApi } from '@/hooks/useMailApi';
 import { API_BASE } from '@/lib/api';
@@ -27,9 +28,15 @@ import type { Message } from '@/types/mail';
 
 const Inbox = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useIsMobile();
   const { user, loading: authLoading, logout, isAuthenticated } = useAuth();
   const { setDomainAccent } = useTheme();
+
+  // Clear any stale error toasts on route change or mount
+  useEffect(() => {
+    toast.dismiss();
+  }, [location.pathname]);
   
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
   const [searchQuery, setSearchQuery] = useState('');
