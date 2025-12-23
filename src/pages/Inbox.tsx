@@ -317,6 +317,12 @@ const Inbox = () => {
         onBulkDelete={bulkDeleteMessages}
         deleting={loading.deleting}
         bulkDeleting={loading.bulkDeleting}
+        allowedDomains={sendConfigData?.data?.allowedDomains || []}
+        onReply={(message) => {
+          // Convert MessagePreview to Message for reply
+          const fullMessage = { ...message, inboxId: message.inboxId || '' } as unknown as Message;
+          handleReply(fullMessage);
+        }}
       />
     );
   };

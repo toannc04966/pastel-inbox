@@ -28,6 +28,7 @@ export interface SentMessage {
 
 export interface SendEmailPayload {
   from?: string;
+  from_name?: string;
   to: string[];
   cc?: string[];
   bcc?: string[];
@@ -49,6 +50,7 @@ export interface SendEmailResponse {
 
 export interface ComposeDraft {
   from: string;
+  from_name?: string;
   to: string[];
   cc: string[];
   bcc: string[];

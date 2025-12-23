@@ -1,4 +1,4 @@
-import { Search, Inbox, Trash2, Check } from 'lucide-react';
+import { Search, Inbox, Trash2, Check, Reply } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +55,8 @@ interface MessageListProps {
   onBulkDelete?: (ids: string[]) => Promise<{ total: number; failed: number }>;
   deleting?: boolean;
   bulkDeleting?: boolean;
+  allowedDomains?: string[];
+  onReply?: (message: MessagePreview) => void;
 }
 
 function SkeletonRow() {
@@ -66,6 +68,12 @@ function SkeletonRow() {
     </div>
   );
 }
+
+// Helper function to extract domain from email
+const getDomainFromEmail = (email: string): string => {
+  const parts = email.split('@');
+  return parts[1]?.toLowerCase() || '';
+};
 
 export function MessageList({
   messages,
@@ -80,6 +88,8 @@ export function MessageList({
   onBulkDelete,
   deleting = false,
   bulkDeleting = false,
+  allowedDomains = [],
+  onReply,
 }: MessageListProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const { t } = useLanguage();
@@ -280,6 +290,10 @@ export function MessageList({
               const messageIsRead = isRead ? isRead(message.id) : true;
               const isSelected = selectedIds.has(message.id);
               
+              // Check if this email is from an owned domain (can reply)
+              const recipientDomain = message.inboxId ? getDomainFromEmail(message.inboxId) : (message.domain || '');
+              const canReply = onReply && allowedDomains.includes(recipientDomain);
+              
               return (
                 <div
                   key={message.id}
@@ -357,18 +371,48 @@ export function MessageList({
                       </div>
                     </div>
                     
-                    {/* Single delete button (hidden in select mode) */}
-                    {!selectMode && onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => handleSingleDelete(message, e)}
-                        disabled={deleting}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0"
-                        aria-label="Delete email"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    {/* Action buttons (hidden in select mode) */}
+                    {!selectMode && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                        {/* Reply button - only for owned domains */}
+                        {canReply && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onReply(message);
+                                  }}
+                                  className="h-7 w-7 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                                  aria-label="Reply to email"
+                                >
+                                  <Reply className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Reply</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                        
+                        {/* Delete button */}
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => handleSingleDelete(message, e)}
+                            disabled={deleting}
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            aria-label="Delete email"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
