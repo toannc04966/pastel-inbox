@@ -141,6 +141,7 @@ export function ComposeModal({
 
   const [fromUsername, setFromUsername] = useState('');
   const [selectedDomain, setSelectedDomain] = useState('');
+  const [senderName, setSenderName] = useState('');
   const [to, setTo] = useState<string[]>([]);
   const [cc, setCc] = useState<string[]>([]);
   const [bcc, setBcc] = useState<string[]>([]);
@@ -164,7 +165,7 @@ export function ComposeModal({
   // Computed full from address
   const from = fromUsername && selectedDomain ? `${fromUsername}@${selectedDomain}` : '';
 
-  const hasContent = to.length > 0 || subject.trim() || htmlContent.trim() || textContent.trim() || fromUsername.trim();
+  const hasContent = to.length > 0 || subject.trim() || htmlContent.trim() || textContent.trim() || fromUsername.trim() || senderName.trim();
 
   // Set default domain when config loads
   useEffect(() => {
@@ -213,6 +214,7 @@ export function ComposeModal({
             setSelectedDomain(domain);
           }
         }
+        if (draft.from_name) setSenderName(draft.from_name);
         setTo(draft.to || []);
         setCc(draft.cc || []);
         setBcc(draft.bcc || []);
@@ -236,6 +238,15 @@ export function ComposeModal({
       const prefix = originalSubject.toLowerCase().startsWith('re:') ? '' : 'Re: ';
       setSubject(`${prefix}${originalSubject}`);
       
+      // Set from address based on the inbox that received this email
+      if (replyTo.inboxId && replyTo.inboxId.includes('@')) {
+        const [username, domain] = replyTo.inboxId.split('@');
+        if (username) setFromUsername(username);
+        if (domain && allowedDomains.includes(domain)) {
+          setSelectedDomain(domain);
+        }
+      }
+      
       const date = format(new Date(replyTo.receivedAt), 'MMM d, yyyy HH:mm');
       const quotedContent = `<br><br><p>On ${date}, ${replyTo.from} wrote:</p><blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 0; color: #666;">${
         replyTo.content_html || replyTo.html || replyTo.content?.html || `<p>${replyTo.content_text || replyTo.text || replyTo.content?.text || ''}</p>`
@@ -253,6 +264,15 @@ export function ComposeModal({
       const prefix = originalSubject.toLowerCase().startsWith('fwd:') ? '' : 'Fwd: ';
       setSubject(`${prefix}${originalSubject}`);
       
+      // Set from address based on the inbox that received this email
+      if (forward.inboxId && forward.inboxId.includes('@')) {
+        const [username, domain] = forward.inboxId.split('@');
+        if (username) setFromUsername(username);
+        if (domain && allowedDomains.includes(domain)) {
+          setSelectedDomain(domain);
+        }
+      }
+      
       const date = format(new Date(forward.receivedAt), 'MMM d, yyyy HH:mm');
       const toList = Array.isArray(forward.to) ? forward.to.join(', ') : forward.to || '';
       const forwardContent = `<br><br>---------- Forwarded message ----------<br>
@@ -263,7 +283,7 @@ To: ${toList}<br><br>
 ${forward.content_html || forward.html || forward.content?.html || `<p>${forward.content_text || forward.text || forward.content?.text || ''}</p>`}`;
       setHtmlContent(forwardContent);
     }
-  }, [replyTo, replyAll, forward, open, user?.email]);
+  }, [replyTo, replyAll, forward, open, user?.email, allowedDomains]);
 
   // Debounced auto-save draft (60 seconds after last change)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -281,6 +301,7 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
       autoSaveTimerRef.current = setTimeout(() => {
         const draft: ComposeDraft = {
           from,
+          from_name: senderName.trim() || undefined,
           to,
           cc,
           bcc,
@@ -299,7 +320,7 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [open, from, to, cc, bcc, replyToEmail, subject, textContent, htmlContent, hasContent, user?.id]);
+  }, [open, from, senderName, to, cc, bcc, replyToEmail, subject, textContent, htmlContent, hasContent, user?.id]);
 
   const handleClose = () => {
     if (hasContent) {
@@ -328,6 +349,7 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
     if (allowedDomains.length > 0) {
       setSelectedDomain(allowedDomains[0]);
     }
+    setSenderName('');
     setTo([]);
     setCc([]);
     setBcc([]);
@@ -370,6 +392,7 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
       text: textContent || undefined,
     };
 
+    if (senderName.trim()) payload.from_name = senderName.trim();
     if (cc.length > 0) payload.cc = cc;
     if (bcc.length > 0) payload.bcc = bcc;
     if (replyToEmail) payload.reply_to = replyToEmail;
@@ -536,9 +559,24 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
       )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Sender Name (From Name) - Optional */}
+        <div>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">From Name <span className="text-muted-foreground font-normal">(optional)</span></label>
+          <Input
+            value={senderName}
+            onChange={(e) => setSenderName(e.target.value)}
+            placeholder="Your Name or Company Name"
+            disabled={isSelfOnly}
+            className={cn(isSelfOnly && "bg-muted cursor-not-allowed")}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Display name shown to recipients (e.g., "John Doe" or "Support Team")
+          </p>
+        </div>
+
         {/* From - Username + Domain Dropdown */}
         <div>
-          <label className="text-sm font-medium text-foreground mb-1.5 block">From</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">From Email</label>
           <div className="flex items-center gap-2">
             <Input
               value={fromUsername}
@@ -571,7 +609,10 @@ ${forward.content_html || forward.html || forward.content?.html || `<p>${forward
             </p>
           ) : fromUsername && selectedDomain ? (
             <p className="text-xs text-muted-foreground mt-1.5">
-              Email will be sent from: <span className="font-medium text-foreground">{from}</span>
+              {senderName.trim() 
+                ? <>Sent as: <span className="font-medium text-foreground">{senderName.trim()} &lt;{from}&gt;</span></>
+                : <>Email will be sent from: <span className="font-medium text-foreground">{from}</span></>
+              }
             </p>
           ) : null}
         </div>
