@@ -37,6 +37,52 @@ const Inbox = () => {
   useEffect(() => {
     toast.dismiss();
   }, [location.pathname]);
+
+  // Early redirect if not authenticated - MUST be before other hooks that make API calls
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Show loading or redirect state - don't render anything else
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="h-16 border-b border-border/50 bg-card">
+          <div className="h-full px-4 flex items-center">
+            <Skeleton className="h-6 w-32" />
+          </div>
+        </div>
+        <div className="flex-1 p-4 md:p-6">
+          <Skeleton className="h-96 w-full rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // Only render the main content when authenticated
+  return <InboxContent user={user} logout={logout} isMobile={isMobile} setDomainAccent={setDomainAccent} />;
+};
+
+// Separate component that only renders when authenticated
+const InboxContent = ({ 
+  user, 
+  logout, 
+  isMobile, 
+  setDomainAccent 
+}: { 
+  user: any; 
+  logout: () => void; 
+  isMobile: boolean; 
+  setDomainAccent: (domain: string) => void;
+}) => {
+  const location = useLocation();
   
   const [mobileView, setMobileView] = useState<'list' | 'viewer'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -104,7 +150,6 @@ const Inbox = () => {
     },
     staleTime: 0,
     refetchOnMount: 'always',
-    enabled: isAuthenticated,
   });
 
   const hasOnlySelfOnlyMode = sendConfigData?.data?.hasOnlySelfOnlyMode || false;
@@ -168,12 +213,10 @@ const Inbox = () => {
     return success;
   };
 
-  // Fetch domains only when authenticated
+  // Fetch domains on mount (InboxContent only renders when authenticated)
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchDomains();
-    }
-  }, [fetchDomains, isAuthenticated]);
+    fetchDomains();
+  }, [fetchDomains]);
 
   // Fetch messages when domain changes (only for ALL_INBOXES mode)
   useEffect(() => {
@@ -193,13 +236,6 @@ const Inbox = () => {
   useEffect(() => {
     setDomainAccent(selectedDomain);
   }, [selectedDomain, setDomainAccent]);
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/login');
-    }
-  }, [authLoading, isAuthenticated, navigate]);
 
   const handleSelectMessage = (id: string) => {
     fetchMessage(id);
@@ -254,27 +290,6 @@ const Inbox = () => {
     setReplyAll(false);
     setComposeOpen(true);
   };
-
-  // Show loading skeleton while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col">
-        <div className="h-16 border-b border-border/50 bg-card">
-          <div className="h-full px-4 flex items-center">
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </div>
-        <div className="flex-1 p-4 md:p-6">
-          <Skeleton className="h-96 w-full rounded-2xl" />
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
-  }
 
   const inboxEmail = getInboxEmail();
   const showAddressInput = currentPermissionMode === 'ADDRESS_ONLY' && !selectedEmail;
