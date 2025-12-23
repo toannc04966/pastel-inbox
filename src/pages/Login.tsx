@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
 const Login = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -14,7 +16,14 @@ const Login = () => {
     password?: string;
   }>({});
 
-  const { login, error } = useAuth();
+  const { login, error, isAuthenticated, loading: authLoading } = useAuth();
+
+  // Redirect to inbox if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const validate = () => {
     const errors: typeof validationErrors = {};
@@ -41,8 +50,13 @@ const Login = () => {
     if (!validate()) return;
 
     setSubmitting(true);
-    await login(email, password);
-    setSubmitting(false);
+    const success = await login(email, password);
+    
+    // Only reset submitting if login failed
+    // If success, the page will redirect via window.location.href
+    if (!success) {
+      setSubmitting(false);
+    }
   };
 
   return (
