@@ -103,8 +103,11 @@ export function useMailApi() {
       }
     } catch (err) {
       const apiErr = err as ApiError;
-      setError(`Failed to fetch domains: ${apiErr.message}`);
-      toast.error('Failed to load domains');
+      // Don't show error toast for 401 (will redirect to login)
+      if (apiErr.status !== 401) {
+        setError(`Failed to fetch domains: ${apiErr.message}`);
+        toast.error('Failed to load domains');
+      }
     } finally {
       setLoading((prev) => ({ ...prev, domains: false }));
     }

@@ -168,10 +168,12 @@ const Inbox = () => {
     return success;
   };
 
-  // Fetch domains on mount
+  // Fetch domains only when authenticated
   useEffect(() => {
-    fetchDomains();
-  }, [fetchDomains]);
+    if (isAuthenticated) {
+      fetchDomains();
+    }
+  }, [fetchDomains, isAuthenticated]);
 
   // Fetch messages when domain changes (only for ALL_INBOXES mode)
   useEffect(() => {
