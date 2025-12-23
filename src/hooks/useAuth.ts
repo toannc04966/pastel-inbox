@@ -36,9 +36,8 @@ export function useAuth() {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setError(null);
-    // Dismiss any previous error toasts
     toast.dismiss();
     
     try {
@@ -48,23 +47,30 @@ export function useAuth() {
       });
       
       if (res.ok && res.data?.user) {
-        // Clear all React Query caches to reset stale state
         queryClient.clear();
         toast.dismiss();
-        
         setUser(res.data.user);
         toast.success('Logged in successfully');
         
-        // Use setTimeout to ensure state updates complete before redirect
-        // This is more reliable on mobile Safari than await/Promise
-        setTimeout(() => {
-          window.location.replace('/');
-        }, 150);
+        // Force redirect using multiple methods for mobile compatibility
+        const redirectToHome = () => {
+          try {
+            // Try location.assign first (more reliable on some mobile browsers)
+            window.location.assign(window.location.origin + '/');
+          } catch {
+            // Fallback to href
+            window.location.href = '/';
+          }
+        };
+        
+        // Use requestAnimationFrame to ensure UI updates before redirect
+        requestAnimationFrame(() => {
+          setTimeout(redirectToHome, 100);
+        });
         
         return true;
       }
       
-      // Handle error response
       const errorMsg = (res as any).error || 'Login failed';
       setError(errorMsg);
       return false;
