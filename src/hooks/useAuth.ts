@@ -50,10 +50,13 @@ export function useAuth() {
       if (res.ok && res.data?.user) {
         // Clear all React Query caches to reset stale state
         queryClient.clear();
+        toast.dismiss();
         
         setUser(res.data.user);
         toast.success('Logged in successfully');
-        navigate('/');
+        
+        // Force full page navigation to ensure proper redirect on mobile
+        window.location.href = '/';
         return true;
       }
       
