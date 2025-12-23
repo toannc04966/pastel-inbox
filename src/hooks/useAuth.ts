@@ -55,11 +55,12 @@ export function useAuth() {
         setUser(res.data.user);
         toast.success('Logged in successfully');
         
-        // Small delay to ensure cookie is set before redirect on mobile
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Use setTimeout to ensure state updates complete before redirect
+        // This is more reliable on mobile Safari than await/Promise
+        setTimeout(() => {
+          window.location.replace('/');
+        }, 150);
         
-        // Force full page navigation to ensure proper redirect on mobile
-        window.location.href = '/';
         return true;
       }
       
@@ -73,7 +74,7 @@ export function useAuth() {
       toast.error(apiErr.message);
       return false;
     }
-  }, [navigate, queryClient]);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     try {
