@@ -55,12 +55,17 @@ export function useAuth() {
         setUser(res.data.user);
         toast.success('Logged in successfully');
         
+        // Small delay to ensure cookie is set before redirect on mobile
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Force full page navigation to ensure proper redirect on mobile
         window.location.href = '/';
         return true;
       }
       
-      setError(res.error || 'Login failed');
+      // Handle error response
+      const errorMsg = (res as any).error || 'Login failed';
+      setError(errorMsg);
       return false;
     } catch (err) {
       const apiErr = err as ApiError;
