@@ -105,6 +105,13 @@ function clearDraft(userId?: string) {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Extract only email address from "Name <email>" format
+const extractEmailAddress = (emailString: string): string => {
+  if (!emailString) return '';
+  const match = emailString.match(/<([^>]+)>/);
+  return match ? match[1].trim() : emailString.trim();
+};
+
 export function ComposeModal({
   open,
   onOpenChange,
@@ -233,7 +240,9 @@ export function ComposeModal({
   // Handle reply/forward prefill
   useEffect(() => {
     if (replyTo && open) {
-      setTo([replyTo.from]);
+      // Extract only the email address, not the display name
+      const senderEmail = extractEmailAddress(replyTo.sender_email || replyTo.from);
+      setTo([senderEmail]);
       const originalSubject = replyTo.subject || '';
       const prefix = originalSubject.toLowerCase().startsWith('re:') ? '' : 'Re: ';
       setSubject(`${prefix}${originalSubject}`);
