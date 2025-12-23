@@ -75,6 +75,8 @@ export function useMailApi() {
   const currentPermissionMode = getPermissionMode(selectedDomain);
 
   const fetchDomains = useCallback(async () => {
+    // Clear previous error state before fetching
+    setError(null);
     setLoading((prev) => ({ ...prev, domains: true }));
     try {
       const res = await apiFetch<ApiResponse<{ domains: string[]; permissions: DomainPermission[]; hasAllInboxesAccess?: boolean }>>(
