@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { apiFetch, ApiError } from '@/lib/api';
-import type { MessagePreview, Message, ApiResponse, DomainPermission, PermissionMode } from '@/types/mail';
+import type { MessagePreview, Message, ApiResponse, DomainPermission, PermissionMode, DomainsData } from '@/types/mail';
 import { toast } from 'sonner';
 
 const DOMAIN_STORAGE_KEY = 'tempmail_selected_domain';
@@ -49,6 +49,8 @@ function setStoredEmail(email: string): void {
 export function useMailApi() {
   const [domains, setDomains] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<DomainPermission[]>([]);
+  const [hasOnlySelfOnlyMode, setHasOnlySelfOnlyMode] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>('');
   const [selectedDomain, setSelectedDomain] = useState<string>(getStoredDomain);
   const [selectedEmail, setSelectedEmail] = useState<string>(getStoredEmail);
   const [messages, setMessages] = useState<MessagePreview[]>([]);
@@ -79,7 +81,7 @@ export function useMailApi() {
     setError(null);
     setLoading((prev) => ({ ...prev, domains: true }));
     try {
-      const res = await apiFetch<ApiResponse<{ domains: string[]; permissions: DomainPermission[]; hasAllInboxesAccess?: boolean }>>(
+      const res = await apiFetch<ApiResponse<DomainsData>>(
         '/api/v1/domains'
       );
       if (res.ok && res.data) {
@@ -88,6 +90,8 @@ export function useMailApi() {
         
         setDomains(domainList);
         setPermissions(permissionList);
+        setHasOnlySelfOnlyMode(res.data.hasOnlySelfOnlyMode || false);
+        setUserEmail(res.data.userEmail || '');
 
         // Auto-select "all" if available, otherwise first domain
         const storedDomain = getStoredDomain();
@@ -419,6 +423,8 @@ export function useMailApi() {
   return {
     domains,
     permissions,
+    hasOnlySelfOnlyMode,
+    userEmail,
     selectedDomain,
     selectedEmail,
     messages,

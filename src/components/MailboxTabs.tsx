@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Inbox, Send } from 'lucide-react';
+import { Inbox, Send, Mail } from 'lucide-react';
 
 export type MailboxTab = 'inbox' | 'sent';
 
@@ -9,6 +9,7 @@ interface MailboxTabsProps {
   inboxCount?: number;
   sentCount?: number;
   hidden?: boolean;
+  userEmail?: string;
 }
 
 export function MailboxTabs({
@@ -17,8 +18,27 @@ export function MailboxTabs({
   inboxCount,
   sentCount,
   hidden = false,
+  userEmail,
 }: MailboxTabsProps) {
-  // Don't render tabs if hidden (SELF_ONLY users)
+  // For SELF_ONLY users: show "My Email" header instead of tabs
+  if (hidden && userEmail) {
+    return (
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50 bg-card/50">
+        <Mail className="w-5 h-5 text-primary" />
+        <div>
+          <h2 className="text-sm font-medium text-foreground">My Email</h2>
+          <p className="text-xs text-muted-foreground">{userEmail}</p>
+        </div>
+        {inboxCount !== undefined && inboxCount > 0 && (
+          <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+            {inboxCount > 99 ? '99+' : inboxCount}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Don't render tabs if hidden without userEmail
   if (hidden) {
     return null;
   }
