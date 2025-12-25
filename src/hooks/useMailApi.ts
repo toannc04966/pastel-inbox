@@ -124,7 +124,50 @@ export function useMailApi() {
     }
     abortControllerRef.current = new AbortController();
 
-    // Don't fetch if no domain selected
+    // SELF_ONLY mode: always use email parameter
+    if (hasOnlySelfOnlyMode) {
+      if (!userEmail) {
+        setMessages([]);
+        return;
+      }
+
+      setLoading((prev) => ({ ...prev, messages: true }));
+      setError(null);
+
+      try {
+        const url = `/api/v1/messages?email=${encodeURIComponent(userEmail)}`;
+        console.log('[Messages] SELF_ONLY fetch:', url);
+
+        const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
+          url,
+          { signal: abortControllerRef.current.signal }
+        );
+
+        if (res.ok && res.data) {
+          setMessages(res.data.messages || []);
+        }
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        
+        const apiErr = err as ApiError;
+        if (apiErr.status === 403) {
+          setError('Access denied. You may not have permission for this resource.');
+          toast.error('Access denied');
+        } else if (apiErr.status === 401) {
+          setError('Session expired. Please log in again.');
+        } else {
+          setError(apiErr.message || 'Failed to fetch messages');
+        }
+        
+        setMessages([]);
+        console.error('[Mail] Fetch messages error:', err);
+      } finally {
+        setLoading((prev) => ({ ...prev, messages: false }));
+      }
+      return;
+    }
+
+    // Normal mode: use domain parameter
     if (!selectedDomain) {
       setMessages([]);
       return;
@@ -149,6 +192,8 @@ export function useMailApi() {
       } else {
         url = `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
       }
+      
+      console.log('[Messages] Normal fetch:', url);
 
       const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
         url,
@@ -179,7 +224,7 @@ export function useMailApi() {
     } finally {
       setLoading((prev) => ({ ...prev, messages: false }));
     }
-  }, [selectedDomain, selectedEmail, getPermissionMode]);
+  }, [hasOnlySelfOnlyMode, userEmail, selectedDomain, selectedEmail, getPermissionMode]);
 
   const fetchMessagesByEmail = useCallback(async (email: string): Promise<number> => {
     // Cancel any pending request
