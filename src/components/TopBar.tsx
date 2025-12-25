@@ -33,6 +33,8 @@ interface TopBarProps {
   messageCount?: number;
   getPermissionMode?: (domain: string) => PermissionMode | null;
   onCompose?: () => void;
+  hasOnlySelfOnlyMode?: boolean;
+  userEmail?: string;
 }
 
 export function TopBar({
@@ -55,6 +57,8 @@ export function TopBar({
   messageCount = 0,
   getPermissionMode,
   onCompose,
+  hasOnlySelfOnlyMode = false,
+  userEmail,
 }: TopBarProps) {
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const { t } = useLanguage();
@@ -92,57 +96,72 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* Domain Selector */}
-        {loading && domains.length === 0 ? (
-          <Skeleton className="w-32 md:w-40 h-10 rounded-xl" />
-        ) : domains.length === 0 ? (
-          <span className="text-sm text-muted-foreground px-3">
-            {t('noDomains')}
-          </span>
+        {/* SELF_ONLY users: Show email badge instead of domain selector */}
+        {hasOnlySelfOnlyMode ? (
+          userEmail && (
+            <Badge 
+              variant="outline" 
+              className="flex items-center gap-2 px-3 py-1.5 h-10 bg-primary/10 border-primary/30 rounded-xl"
+            >
+              <Mail className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">{userEmail}</span>
+            </Badge>
+          )
         ) : (
-          <div className="flex items-center gap-2">
-            <Select value={selectedDomain} onValueChange={onDomainChange}>
-              <SelectTrigger className="w-[120px] md:w-[180px] rounded-xl bg-secondary border-0 h-10 theme-transition">
-                <SelectValue placeholder={t('selectDomain')} />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl">
-                {domains.map((domain) => {
-                  const mode = getPermissionMode?.(domain);
-                  const isAll = domain === 'all';
-                  return (
-                    <SelectItem key={domain} value={domain} className="rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <span>{isAll ? t('allDomains') : `@${domain}`}</span>
-                        {mode === 'ADDRESS_ONLY' && (
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/20 text-amber-600 dark:text-amber-400">
-                            ADDR
-                          </Badge>
-                        )}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+          <>
+            {/* Domain Selector */}
+            {loading && domains.length === 0 ? (
+              <Skeleton className="w-32 md:w-40 h-10 rounded-xl" />
+            ) : domains.length === 0 ? (
+              <span className="text-sm text-muted-foreground px-3">
+                {t('noDomains')}
+              </span>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Select value={selectedDomain} onValueChange={onDomainChange}>
+                  <SelectTrigger className="w-[120px] md:w-[180px] rounded-xl bg-secondary border-0 h-10 theme-transition">
+                    <SelectValue placeholder={t('selectDomain')} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {domains.map((domain) => {
+                      const mode = getPermissionMode?.(domain);
+                      const isAll = domain === 'all';
+                      return (
+                        <SelectItem key={domain} value={domain} className="rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <span>{isAll ? t('allDomains') : `@${domain}`}</span>
+                            {mode === 'ADDRESS_ONLY' && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                                ADDR
+                              </Badge>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
 
-            {/* Show selected email badge for ADDRESS_ONLY mode */}
-            {isAddressOnly && selectedEmail && (
-              <Badge 
-                variant="outline" 
-                className="hidden md:flex items-center gap-1 px-2 py-1 h-8 bg-primary/10 border-primary/30"
-              >
-                <span className="truncate max-w-[120px]">{selectedEmail}</span>
-                {onEmailClear && (
-                  <button
-                    onClick={onEmailClear}
-                    className="ml-1 hover:bg-primary/20 rounded p-0.5 transition-colors"
+                {/* Show selected email badge for ADDRESS_ONLY mode */}
+                {isAddressOnly && selectedEmail && (
+                  <Badge 
+                    variant="outline" 
+                    className="hidden md:flex items-center gap-1 px-2 py-1 h-8 bg-primary/10 border-primary/30"
                   >
-                    <X className="w-3 h-3" />
-                  </button>
+                    <span className="truncate max-w-[120px]">{selectedEmail}</span>
+                    {onEmailClear && (
+                      <button
+                        onClick={onEmailClear}
+                        className="ml-1 hover:bg-primary/20 rounded p-0.5 transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </Badge>
                 )}
-              </Badge>
+              </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Auto-Refresh Toggle */}

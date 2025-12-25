@@ -95,6 +95,8 @@ const InboxContent = ({
   const {
     domains,
     permissions,
+    hasOnlySelfOnlyMode,
+    userEmail: selfOnlyEmail,
     selectedDomain,
     selectedEmail,
     messages,
@@ -140,7 +142,7 @@ const InboxContent = ({
     30000
   );
 
-  // Fetch send config to check if user has only SELF_ONLY mode
+  // Fetch send config for allowedDomains (used in MessageList)
   const { data: sendConfigData } = useQuery({
     queryKey: ['send-config'],
     queryFn: async () => {
@@ -151,9 +153,6 @@ const InboxContent = ({
     staleTime: 0,
     refetchOnMount: 'always',
   });
-
-  const hasOnlySelfOnlyMode = sendConfigData?.data?.hasOnlySelfOnlyMode || false;
-  const selfOnlyEmail = sendConfigData?.data?.defaultFrom || '';
 
   // For SELF_ONLY users, auto-fetch their inbox by email
   useEffect(() => {
@@ -382,19 +381,19 @@ const InboxContent = ({
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar
-        domains={domains}
+        domains={hasOnlySelfOnlyMode ? [] : domains}
         permissions={permissions}
         selectedDomain={selectedDomain}
-        selectedEmail={selectedEmail}
+        selectedEmail={hasOnlySelfOnlyMode ? selfOnlyEmail : selectedEmail}
         onDomainChange={handleDomainChange}
-        onEmailClear={() => handleEmailChange('')}
+        onEmailClear={hasOnlySelfOnlyMode ? undefined : () => handleEmailChange('')}
         onRefresh={handleRefresh}
         onClearInbox={handleClearInboxWithReset}
         loading={loading.messages || loading.domains}
         clearingInbox={loading.clearingInbox}
         user={user}
         onLogout={logout}
-        inboxEmail={inboxEmail}
+        inboxEmail={hasOnlySelfOnlyMode ? selfOnlyEmail : inboxEmail}
         autoRefreshEnabled={autoRefreshEnabled}
         autoRefreshPaused={isPaused}
         onToggleAutoRefresh={toggleAutoRefresh}
@@ -406,19 +405,22 @@ const InboxContent = ({
           setForward(null);
           setComposeOpen(true);
         }}
+        hasOnlySelfOnlyMode={hasOnlySelfOnlyMode}
+        userEmail={selfOnlyEmail}
       />
 
       {(error || sentError) && <ErrorBanner message={error || sentError || ''} onDismiss={() => setError(null)} />}
 
       <div className="flex-1 p-2 md:p-6 overflow-hidden">
         <div className="pastel-card flex-1 overflow-hidden h-[calc(100vh-88px)] md:h-[calc(100vh-140px)] flex flex-col">
-          {/* Mailbox Tabs - Hidden for SELF_ONLY users */}
+          {/* Mailbox Tabs - Hidden for SELF_ONLY users, show "My Email" header instead */}
           <MailboxTabs
             activeTab={activeTab}
             onTabChange={handleTabChange}
             inboxCount={messages.length}
             sentCount={sentMessages.length}
             hidden={hasOnlySelfOnlyMode}
+            userEmail={selfOnlyEmail}
           />
 
           {isMobile ? (
