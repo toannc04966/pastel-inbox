@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 const DOMAIN_STORAGE_KEY = 'tempmail_selected_domain';
 const EMAIL_STORAGE_KEY = 'tempmail_selected_email';
+const ITEMS_PER_PAGE_KEY = 'tempmail_items_per_page';
 
 function getStoredDomain(): string {
   try {
@@ -46,6 +47,24 @@ function setStoredEmail(email: string): void {
   }
 }
 
+function getStoredItemsPerPage(): number {
+  try {
+    const stored = localStorage.getItem(ITEMS_PER_PAGE_KEY);
+    const value = stored ? parseInt(stored, 10) : 20;
+    return [10, 20, 50, 100].includes(value) ? value : 20;
+  } catch {
+    return 20;
+  }
+}
+
+function setStoredItemsPerPage(value: number): void {
+  try {
+    localStorage.setItem(ITEMS_PER_PAGE_KEY, String(value));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function useMailApi() {
   const [domains, setDomains] = useState<string[]>([]);
   const [permissions, setPermissions] = useState<DomainPermission[]>([]);
@@ -64,6 +83,11 @@ export function useMailApi() {
     clearingInbox: false,
   });
   const [error, setError] = useState<string | null>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(getStoredItemsPerPage);
+  const [totalItems, setTotalItems] = useState(0);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -117,17 +141,22 @@ export function useMailApi() {
     }
   }, []);
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (page?: number, limit?: number) => {
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
 
+    const usePage = page ?? currentPage;
+    const useLimit = limit ?? itemsPerPage;
+    const offset = (usePage - 1) * useLimit;
+
     // SELF_ONLY mode: always use email parameter
     if (hasOnlySelfOnlyMode) {
       if (!userEmail) {
         setMessages([]);
+        setTotalItems(0);
         return;
       }
 
@@ -135,16 +164,30 @@ export function useMailApi() {
       setError(null);
 
       try {
-        const url = `/api/v1/messages?email=${encodeURIComponent(userEmail)}`;
+        const url = `/api/v1/messages?email=${encodeURIComponent(userEmail)}&limit=${useLimit}&offset=${offset}`;
         console.log('[Messages] SELF_ONLY fetch:', url);
 
-        const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
+        const res = await apiFetch<ApiResponse<{ messages: MessagePreview[]; total?: number }>>(
           url,
           { signal: abortControllerRef.current.signal }
         );
 
         if (res.ok && res.data) {
-          setMessages(res.data.messages || []);
+          const msgs = res.data.messages || [];
+          setMessages(msgs);
+          
+          // Handle total count - backend may or may not return it
+          if (typeof res.data.total === 'number') {
+            setTotalItems(res.data.total);
+          } else {
+            // Estimate: if full page returned, assume there are more
+            const loadedSoFar = (usePage - 1) * useLimit + msgs.length;
+            if (msgs.length === useLimit) {
+              setTotalItems(Math.max(totalItems, loadedSoFar + useLimit));
+            } else {
+              setTotalItems(loadedSoFar);
+            }
+          }
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError') return;
@@ -160,6 +203,7 @@ export function useMailApi() {
         }
         
         setMessages([]);
+        setTotalItems(0);
         console.error('[Mail] Fetch messages error:', err);
       } finally {
         setLoading((prev) => ({ ...prev, messages: false }));
@@ -170,6 +214,7 @@ export function useMailApi() {
     // Normal mode: use domain parameter
     if (!selectedDomain) {
       setMessages([]);
+      setTotalItems(0);
       return;
     }
 
@@ -178,6 +223,7 @@ export function useMailApi() {
     // For ADDRESS_ONLY mode, require email to be set
     if (mode === 'ADDRESS_ONLY' && !selectedEmail) {
       setMessages([]);
+      setTotalItems(0);
       return;
     }
 
@@ -185,23 +231,37 @@ export function useMailApi() {
     setError(null);
 
     try {
-      let url: string;
+      let baseUrl: string;
       
       if (mode === 'ADDRESS_ONLY' && selectedEmail) {
-        url = `/api/v1/messages?email=${encodeURIComponent(selectedEmail)}`;
+        baseUrl = `/api/v1/messages?email=${encodeURIComponent(selectedEmail)}`;
       } else {
-        url = `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
+        baseUrl = `/api/v1/messages?domain=${encodeURIComponent(selectedDomain)}`;
       }
       
+      const url = `${baseUrl}&limit=${useLimit}&offset=${offset}`;
       console.log('[Messages] Normal fetch:', url);
 
-      const res = await apiFetch<ApiResponse<{ messages: MessagePreview[] }>>(
+      const res = await apiFetch<ApiResponse<{ messages: MessagePreview[]; total?: number }>>(
         url,
         { signal: abortControllerRef.current.signal }
       );
 
       if (res.ok && res.data) {
-        setMessages(res.data.messages || []);
+        const msgs = res.data.messages || [];
+        setMessages(msgs);
+        
+        // Handle total count
+        if (typeof res.data.total === 'number') {
+          setTotalItems(res.data.total);
+        } else {
+          const loadedSoFar = (usePage - 1) * useLimit + msgs.length;
+          if (msgs.length === useLimit) {
+            setTotalItems(Math.max(totalItems, loadedSoFar + useLimit));
+          } else {
+            setTotalItems(loadedSoFar);
+          }
+        }
       }
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
@@ -220,11 +280,12 @@ export function useMailApi() {
       }
       
       setMessages([]);
+      setTotalItems(0);
       console.error('[Mail] Fetch messages error:', err);
     } finally {
       setLoading((prev) => ({ ...prev, messages: false }));
     }
-  }, [hasOnlySelfOnlyMode, userEmail, selectedDomain, selectedEmail, getPermissionMode]);
+  }, [hasOnlySelfOnlyMode, userEmail, selectedDomain, selectedEmail, getPermissionMode, currentPage, itemsPerPage, totalItems]);
 
   const fetchMessagesByEmail = useCallback(async (email: string): Promise<number> => {
     // Cancel any pending request
@@ -314,12 +375,31 @@ export function useMailApi() {
     // Clear selected email when changing domain
     setSelectedEmail('');
     setStoredEmail('');
+    
+    // Reset pagination
+    setCurrentPage(1);
+    setTotalItems(0);
   }, []);
 
   const handleEmailChange = useCallback((email: string) => {
     setSelectedEmail(email);
     setStoredEmail(email);
     setSelectedMessage(null);
+    
+    // Reset pagination
+    setCurrentPage(1);
+    setTotalItems(0);
+  }, []);
+
+  // Pagination handlers
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
+  }, []);
+
+  const handleItemsPerPageChange = useCallback((value: number) => {
+    setItemsPerPage(value);
+    setStoredItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page
   }, []);
 
   const deleteMessage = useCallback(async (messageId: string): Promise<boolean> => {
@@ -477,6 +557,13 @@ export function useMailApi() {
     loading,
     error,
     currentPermissionMode,
+    // Pagination
+    currentPage,
+    itemsPerPage,
+    totalItems,
+    handlePageChange,
+    handleItemsPerPageChange,
+    // Actions
     setError,
     handleDomainChange,
     handleEmailChange,
