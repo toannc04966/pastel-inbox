@@ -104,6 +104,13 @@ const InboxContent = ({
     loading,
     error,
     currentPermissionMode,
+    // Pagination
+    currentPage,
+    itemsPerPage,
+    totalItems,
+    handlePageChange,
+    handleItemsPerPageChange,
+    // Actions
     setError,
     handleDomainChange: originalHandleDomainChange,
     handleEmailChange,
@@ -217,12 +224,12 @@ const InboxContent = ({
     fetchDomains();
   }, [fetchDomains]);
 
-  // Fetch messages when domain changes (only for ALL_INBOXES mode)
+  // Fetch messages when domain or pagination changes (only for ALL_INBOXES mode)
   useEffect(() => {
     if (currentPermissionMode === 'ALL_INBOXES') {
-      fetchMessages();
+      fetchMessages(currentPage, itemsPerPage);
     }
-  }, [fetchMessages, currentPermissionMode, selectedDomain]);
+  }, [fetchMessages, currentPermissionMode, selectedDomain, currentPage, itemsPerPage]);
 
   // Fetch sent messages when tab changes to sent
   useEffect(() => {
@@ -346,6 +353,12 @@ const InboxContent = ({
           const fullMessage = { ...message, inboxId: message.inboxId || '' } as unknown as Message;
           handleReply(fullMessage);
         }}
+        // Pagination props
+        currentPage={currentPage}
+        totalItems={totalItems}
+        itemsPerPage={itemsPerPage}
+        onPageChange={handlePageChange}
+        onItemsPerPageChange={handleItemsPerPageChange}
       />
     );
   };

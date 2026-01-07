@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
+import { EmailPagination } from '@/components/EmailPagination';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +58,12 @@ interface MessageListProps {
   bulkDeleting?: boolean;
   allowedDomains?: string[];
   onReply?: (message: MessagePreview) => void;
+  // Pagination props
+  currentPage?: number;
+  totalItems?: number;
+  itemsPerPage?: number;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (value: number) => void;
 }
 
 function SkeletonRow() {
@@ -90,6 +97,12 @@ export function MessageList({
   bulkDeleting = false,
   allowedDomains = [],
   onReply,
+  // Pagination props
+  currentPage = 1,
+  totalItems = 0,
+  itemsPerPage = 20,
+  onPageChange,
+  onItemsPerPageChange,
 }: MessageListProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const { t } = useLanguage();
@@ -421,6 +434,18 @@ export function MessageList({
           </div>
         )}
       </div>
+
+      {/* Pagination */}
+      {onPageChange && onItemsPerPageChange && totalItems > 0 && (
+        <EmailPagination
+          currentPage={currentPage}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          onPageChange={onPageChange}
+          onItemsPerPageChange={onItemsPerPageChange}
+          loading={loading}
+        />
+      )}
 
       {/* Single Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
