@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, KeyRound, Users, RefreshCw, Shield } from 'lucide-react';
+import { ArrowLeft, Plus, KeyRound, Users, RefreshCw, Shield, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -23,6 +23,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PermissionsModal } from '@/components/PermissionsModal';
@@ -50,6 +60,7 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
@@ -61,6 +72,9 @@ const Admin = () => {
   // Reset password form
   const [resetPassword, setResetPassword] = useState('');
   const [resetting, setResetting] = useState(false);
+
+  // Delete user
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -121,12 +135,19 @@ const Admin = () => {
 
     setResetting(true);
     try {
-      await apiFetch(`/api/v1/admin/users/${selectedUser.id}/password`, {
+      const response = await apiFetch<any>(`/api/v1/admin/users/${selectedUser.id}/reset-password`, {
         method: 'POST',
         body: JSON.stringify({ newPassword: resetPassword }),
         credentials: 'include',
       });
-      toast.success(t('passwordReset'));
+
+      if (response.ok) {
+        const sessionsRevoked = response.data?.sessionsRevoked || 0;
+        toast.success(t('passwordReset') + ` (${sessionsRevoked} sessions revoked)`);
+      } else {
+        toast.success(t('passwordReset'));
+      }
+
       setResetPasswordDialogOpen(false);
       setSelectedUser(null);
       setResetPassword('');
@@ -137,10 +158,41 @@ const Admin = () => {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    // Prevent deleting yourself
+    if (selectedUser.id === user?.id) {
+      toast.error(t('cannotDeleteYourself') || 'Cannot delete your own account');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await apiFetch(`/api/v1/admin/users/${selectedUser.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      toast.success(t('userDeleted') || `User ${selectedUser.email} deleted successfully`);
+      setDeleteDialogOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || t('deleteUserFailed') || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const openResetPasswordDialog = (adminUser: AdminUser) => {
     setSelectedUser(adminUser);
     setResetPassword('');
     setResetPasswordDialogOpen(true);
+  };
+
+  const openDeleteDialog = (adminUser: AdminUser) => {
+    setSelectedUser(adminUser);
+    setDeleteDialogOpen(true);
   };
 
   const openPermissionsDialog = (adminUser: AdminUser) => {
@@ -258,15 +310,42 @@ const Admin = () => {
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openResetPasswordDialog(adminUser)}
-                          className="rounded-lg"
-                        >
-                          <KeyRound className="w-4 h-4 mr-1" />
-                          {t('resetPassword')}
-                        </Button>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openResetPasswordDialog(adminUser)}
+                                className="rounded-lg h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              >
+                                <KeyRound className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{t('resetPassword')}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {adminUser.id !== user?.id && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openDeleteDialog(adminUser)}
+                                  className="rounded-lg h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{t('deleteUser')}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -360,6 +439,33 @@ const Admin = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              {t('deleteUser')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deleteUserConfirmation', { email: selectedUser?.email || '' })}
+              <br /><br />
+              <strong className="text-red-600">{t('deleteUserWarning') || 'This action cannot be undone. This will permanently delete the user account, all sessions, and permissions.'}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? t('deleting') || 'Deleting...' : t('delete') || 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Permissions Modal */}
       <PermissionsModal
