@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiFetch, ApiError } from '@/lib/api';
+import { apiFetch, ApiError, setCsrfToken } from '@/lib/api';
 import type { User, AuthResponse } from '@/types/auth';
 import { toast } from 'sonner';
 
@@ -18,6 +18,10 @@ export function useAuth() {
       const res = await apiFetch<AuthResponse>('/api/me');
       if (res.ok && res.data?.user) {
         setUser(res.data.user);
+        // Persist CSRF token from /api/me
+        if ((res.data as any).csrfToken) {
+          setCsrfToken((res.data as any).csrfToken);
+        }
         return true;
       }
       setUser(null);
@@ -50,20 +54,21 @@ export function useAuth() {
         queryClient.clear();
         toast.dismiss();
         setUser(res.data.user);
+        // Persist CSRF token from login response
+        if ((res.data as any).csrfToken) {
+          setCsrfToken((res.data as any).csrfToken);
+        }
         toast.success('Logged in successfully');
         
         // Force redirect using multiple methods for mobile compatibility
         const redirectToHome = () => {
           try {
-            // Try location.assign first (more reliable on some mobile browsers)
             window.location.assign(window.location.origin + '/');
           } catch {
-            // Fallback to href
             window.location.href = '/';
           }
         };
         
-        // Use requestAnimationFrame to ensure UI updates before redirect
         requestAnimationFrame(() => {
           setTimeout(redirectToHome, 100);
         });
@@ -91,6 +96,7 @@ export function useAuth() {
     } catch (err) {
       console.error('[Auth] Logout error:', err);
     } finally {
+      setCsrfToken(null);
       setUser(null);
       localStorage.removeItem('tempmail_inbox');
       toast.success('Logged out');

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { apiFetch, ApiError, API_BASE } from '@/lib/api';
+import { apiFetch, ApiError, API_BASE, getCsrfToken } from '@/lib/api';
 import type { SentMessagePreview, SentMessage, SendEmailPayload, SendEmailResponse } from '@/types/sent';
 import type { ApiResponse } from '@/types/mail';
 import { toast } from 'sonner';
@@ -185,11 +185,17 @@ export function useSentApi() {
           formData.append(`attachment_${index}`, file);
         });
 
+        const sendHeaders: Record<string, string> = {};
+        const token = getCsrfToken();
+        if (token) {
+          sendHeaders['x-csrf-token'] = token;
+        }
+
         const response = await fetch(`${API_BASE}/api/v1/send`, {
           method: 'POST',
           credentials: 'include',
+          headers: sendHeaders,
           body: formData,
-          // Don't set Content-Type header - browser will set it with boundary
         });
 
         if (!response.ok) {
