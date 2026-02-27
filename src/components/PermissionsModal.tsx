@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Shield, AlertCircle, Check, ChevronsUpDown, Mail, Send, Loader2 } from 'lucide-react';
-import { apiFetch, API_BASE } from '@/lib/api';
+import { apiFetch, API_BASE, getCsrfToken } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -319,9 +319,13 @@ export function PermissionsModal({
     
     setIsSendSaving(true);
     try {
+      const token = getCsrfToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['x-csrf-token'] = token;
+      
       const res = await fetch(`${API_BASE}/api/v1/admin/users/${userId}/send-permissions`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({ sendDomains }),
       });
